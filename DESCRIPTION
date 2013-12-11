@@ -1,0 +1,12 @@
+Package: bvsflex
+Version: 0.1
+Date: 2013-12-12
+Author: Manuela Zucknick
+Maintainer: Manuela Zucknick <m.zucknick@dkfz-heidelberg.de>
+Title: Integrative Bayesian variable selection with flexible priors
+Depends: 
+Imports: 
+Suggests: 
+Description: The BVSflex package implements efficient Bayesian variable selection models for high-dimensional input data. A flexible selection prior allows the incorporation of additional information, e.g. a second data source including all sources of variation.
+License: GPL-2
+LazyLoad: yes
