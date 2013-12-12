@@ -113,7 +113,7 @@ double dmvnorm(double *Z, int n, double *Zmean, double *Zprec, char Log, int pga
 	//(For internal notation, see dmvnorm() in R package mvtnorm.)
 	
 	const int one = 1;
-	const char Lower = 'L', Upper = 'U', NoTrans = 'N', Trans = 'T', Diag = 'U', NoDiag = 'N';
+	const char Lower = 'L', Trans = 'T', NoDiag = 'N';
 	
 	double Zcentered[n];
 	for (int j = 0; j < n; j++) {
@@ -167,7 +167,7 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 	
 	const int one = 1;
 	const double oned = 1.0, zerod = 0.0, moned = -1.0;
-	const char Lower = 'L', Upper = 'U', NoTrans = 'N', Trans = 'T';
+	const char Upper = 'U', NoTrans = 'N', Trans = 'T';
 	
 	double sqrtinvLAM[n];
 	for (int j = 0; j < n; j++) {
@@ -254,7 +254,7 @@ double Pgam_update(int pgam, int n, double *Xgam, double *bgam,
 	
 	const int one = 1;
 	const double oned = 1.0, zerod = 0.0, moned = -1.0;
-	const char Lower = 'L', Upper = 'U', NoTrans = 'N', Trans = 'T';
+	const char Lower = 'L', NoTrans = 'N', Trans = 'T';
 	
 	//Zprecgam = invLAM - invLAM%*%Xgam%*%Vgam%*%t(Xgam)%*%invLAM;
 	double Lgam[(pgam * pgam)];
@@ -294,8 +294,8 @@ void betaGAM_update(int n, int p, double *X,
 {	
 	//const double K1 = 0, K2 = 0; other options are not yet implemented
 	const int one = 1;
-	const double oned = 1.0, zerod = 0.0, moned = -1.0;
-	const char Lower = 'L', Upper = 'U', NoTrans = 'N', Trans = 'T', NoLog = 'N', Log = 'L';
+	const double oned = 1.0;
+	const char Upper = 'U', Trans = 'T', NoLog = 'N', Log = 'L';
 	
 	int pgam = 0;
 	for (int k = 0; k < p; k++) {
@@ -621,7 +621,6 @@ double lambdadist_temp(double r, double T)
 	
 	// Global constants that are needed often,
 	// compute only once here to save computing time
-	double lT = log(T);
 	double Tr = (1/T) * r;
 	
 	double LAMlocal = 0;
@@ -801,6 +800,3 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	
 	PutRNGstate();	
 }
-
-
-
