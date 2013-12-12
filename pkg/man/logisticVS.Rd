@@ -39,12 +39,14 @@ X <- matrix(rnorm(n*p), ncol=p)
 beta <- c(1,1,1,rep(0,p-3))
 expeta <- exp(X\%*\%beta)
 Y <- rbinom(n, 1, prob=expeta/(expeta + 1))
-res <- logisticVS(X, Y, b=rep(0,p), v=rep(1,p), Pi=0.1, block=diag(1,p), MCMC=B, thinn=1, seed=1234, outdir=paste(getwd(), "example", sep="/"))
+res <- logisticVS(X, Y, b=rep(0,p), v=rep(1,p), Pi=0.1, block=diag(1,p), 
+       MCMC=B, thinn=1, seed=1234, outdir=paste(getwd(), "example", sep="/"))
 
-### NOT RUN
+\dontrun{
 require(Matrix)
 tmp <- read.table(paste(res, "GAM.txt", sep="/"))
 GAM <- as.matrix(sparseMatrix(i = tmp[,1], j = tmp[,2], x = tmp[,3]))
-image(y=1:p, x=1:B, z=t(GAM), col=c("white","black"), ylab="variables", xlab="MCMC iteration", main="Trace plot for GAM")
-### NOT RUN
+image(y=1:p, x=1:B, z=t(GAM), col=c("white","black"), ylab="variables", 
+      xlab="MCMC iteration", main="Trace plot for GAM")
+}
 }
