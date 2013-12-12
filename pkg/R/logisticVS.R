@@ -1,7 +1,7 @@
 #Logistic Bayesian variable selection (with 'singleGibbs' block Gibbs sampler for updating GAM and beta), with flexible variable selection prior Pi, allow input of (empirical) distribution for Pi in form of a matrix 
 #Manuela Zucknick, 21-05-2011, last modified 13-11-2013
 
-logisticVS <- function(X, Y, b, v, Pi, block, MCMC, thinn=1, seed=1234, outdir=NULL){
+logisticVS <- function(X, Y, b, v, Pi, block=NULL, MCMC, thinn=1, seed=1234, outdir=NULL){
 # Pi = either a scalar, if the prior selection probability pi_i is the same for all variable indices i
 #	or a vector of length p, if the prior selection probabilities pi_i can vary, but has no associated distribution
 #	or a (#subsamples x p) matrix of subsamples, if for each i (=1,...,p) an empirical distribution for pi_i is provided.
@@ -11,11 +11,17 @@ logisticVS <- function(X, Y, b, v, Pi, block, MCMC, thinn=1, seed=1234, outdir=N
   set.seed(seed);
   
   startdir <- getwd();
-  if(is.null(outdir)) outdir <- startdir;
-  setwd(outdir);
+  if(is.null(outdir)){
+    outdir <- startdir;
+  }else{
+    dir.create(outdir);
+  }
+  setwd(outdir);  
   
   n = nrow(X);
   p = ncol(X);
+  
+  if(is.null(block)) block <- diag(1,p);
   
   if(length(Y) != n) stop("Length of Y has to be the same as nrow(X) = n.\n");
   if(all(sort(unique(Y)) != c(0,1))) stop("The class vector Y should always contain both 0's and 1's (and only these values).\n");
@@ -33,7 +39,7 @@ logisticVS <- function(X, Y, b, v, Pi, block, MCMC, thinn=1, seed=1234, outdir=N
     }
   }
   if(!is.wholenumber(MCMC) | MCMC<=0) stop("'MCMC' is the number of MCMC iterations and hence has to be a positive integer.\n")	
-  if(!is.wholenumber(thinn) | MCMC<=thinn) stop("Every 'thinn'-ed MCMC iteration will be kept (i.e. if 'thin'=1 then all iterations are kept, if 'thinn'=10 then only every tenth iteration is returned for posterior inference. Consequently, 'thinn' has to be a positive integer.\n")
+  if(!is.wholenumber(thinn) | MCMC<=thinn) stop("Every 'thinn'-ed MCMC iteration will be kept (i.e. if 'thinn'=1 then all iterations are kept, if 'thinn'=10 then only every tenth iteration is returned for posterior inference. Consequently, 'thinn' has to be a positive integer.\n")
   
   Pi_size = nrow(Pi);
   
@@ -42,8 +48,10 @@ logisticVS <- function(X, Y, b, v, Pi, block, MCMC, thinn=1, seed=1234, outdir=N
       X = as.double(X), Y = as.double(Y), n = as.integer(n), p = as.integer(p),
       b = as.double(b), v = as.double(v), Pi = as.double(Pi), Pi_size = as.integer(Pi_size), 
       block = as.integer(block), MCMC = as.integer(MCMC), 
-      thin = as.integer(thin));   
+      thinn = as.integer(thinn),
+      PACKAGE = "bvsflex");   
    
-  setwd(startdir);         
+  setwd(startdir);  
+  return(outdir);
 }
 
