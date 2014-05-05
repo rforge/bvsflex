@@ -792,7 +792,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	double logLAMz[1];
 	
   double C[1];
-  C[1] = runif(0.0, 1.0);
+  C[0] = runif(0.0, 1.0);
   double Pi[*p];
   for (int i = 0; i < *p; i++){
     Pi[i] = 1.0/(*p);
