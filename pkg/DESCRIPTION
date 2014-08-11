@@ -1,6 +1,6 @@
 Package: bvsflex
-Version: 0.2
-Date: 2014-05-05
+Version: 0.22
+Date: 2014-08-11
 Author: Manuela Zucknick and Ana Corberan
 Maintainer: Manuela Zucknick <m.zucknick@dkfz-heidelberg.de>
 Title: Integrative Bayesian variable selection with flexible priors
