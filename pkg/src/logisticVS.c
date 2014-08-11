@@ -296,7 +296,7 @@ void betaGAM_update(int n, int p, double *X,
 	const int one = 1;
 	const double oned = 1.0;
 	const char Upper = 'U', Trans = 'T', NoLog = 'N', Log = 'L';
-	
+  
 	int pgam = 0;
 	for (int k = 0; k < p; k++) {
 		pgam += GAM[k];
@@ -388,11 +388,11 @@ void betaGAM_update(int n, int p, double *X,
 			Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, vtry, btry, LAM, Z);
 			
 			double Ptry = Pgam_update(ptry, n, Xtry, btry, Z, invLAM, dinvLAM, Vtry, NoLog);
-			
+      
 			//only multiply by p(GAM(i)) because all the rest cancels out anyway
 			double probTRY = Ptry * pow(Pi[i], GAMtry[i]) * pow((1-Pi[i]), (1-GAMtry[i]));
 			double probSTAR = Pstar * pow(Pi[i], GAMstar[i]) * pow((1-Pi[i]), (1-GAMstar[i]));
-			
+      
 			if (probTRY==0 && probSTAR==0){  //to reduce computational problems with precision
 				if (GAMtry[i]==0){           //-> favour more sparse GAM
 					GAMstar[i] = GAMtry[i];  //else: GAMstar(i) = GAM(i)
@@ -483,7 +483,7 @@ void betaGAM_update(int n, int p, double *X,
 		logpostbeta = dmvnorm(betastar, pstar, Bstar, Vprec, Log, pstar);
 		logpriorbeta = dmvnorm(betastar, pstar, bgam, dvprec, Log, pstar);
 	}
-	
+  
 	logprior[0] = logpriorGAM + logpriorbeta;
 	logpost[0] = logPgam + logpostbeta;  //logpriorGAM cancels out anyway
 }
@@ -707,7 +707,8 @@ void LAMz_update(int n, int p, double *X, double *Y,
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-void Pi_update(double *Pi, int *GAM, double C, double *d, int p, int k){
+void Pi_update(double *Pi, int *GAM, double C, double *d,  
+               int p, int k){
   
   double sum_d = 0.0;
   for (int i = 0; i < p; i++){
@@ -727,15 +728,17 @@ void Pi_update(double *Pi, int *GAM, double C, double *d, int p, int k){
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-void C_update(double *C, double *Pi, int *GAM, double *d, int p, int k){
+void C_update(double *C, double *Pi, int *GAM, double *d,
+              int p, int k, double CpropRange, int *accept_count){
 
   double sum_d = 0;
   for (int i = 0; i < p; i++){
     sum_d += d[i];
   }
 
-  //Propose new C' (sample from uniform(0,1)):
-  double Cprop = runif(0.0, 1.0);
+  //Propose new C' (if Cprop.range==0 sample from uniform(0,1), otherwise sample from (max{0, C' - 0.2}, min{C' + 0.2, 1})):
+  double Cprop;
+  Cprop = runif(fmax(0.0, *C-CpropRange), fmin(*C+CpropRange, 1.0));
 
   double aprop[p];
   double bprop[p];
@@ -767,6 +770,8 @@ void C_update(double *C, double *Pi, int *GAM, double *d, int p, int k){
   double U = runif(0.0, 1.0);
   if(U < accept_prob){
     *C = Cprop;
+    
+    *accept_count = *accept_count + 1;
   }
   
   //Rprintf("%.5e %.5e %.5e\n", *C, Cprop, accept_prob);
@@ -776,13 +781,16 @@ void C_update(double *C, double *Pi, int *GAM, double *d, int p, int k){
 //////////////////////////////////////////////////////////////////////////////////////////////
 void logisticVS(double *X, double *Y, int *n, int *p,
 				double *b, double *v, int *k, double *d,
-				int *block, int *MCMC, int *thins){
+				int *block, int *MCMC, int *thins, double *CpropRange, 
+        int *Piupdate, int *Cupdate, int *burnin){
 	
 	GetRNGstate();	
 	
 	int thin[1];
 	thin[0] = thins[0];
 	double T = 1.0;
+  int accept_count[1];
+  accept_count[0] = 0;
 	
 	int K2;
 	int numneigh[1];
@@ -790,12 +798,21 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	double logpriorGAMbeta[1];
 	double logpostGAMbeta[1];
 	double logLAMz[1];
+  
+  double sum_d = 0;
+  for (int i = 0; i < *p; i++){
+    sum_d += d[i];
+  }
 	
   double C[1];
-  C[0] = runif(0.0, 1.0);
+  C[0] = 1.0;
+  if(*Cupdate==1){
+    C[0] = runif(0.0, 1.0);
+  }
+  
   double Pi[*p];
   for (int i = 0; i < *p; i++){
-    Pi[i] = 1.0/(*p);
+    Pi[i] = (float)(*k) * d[i]/sum_d;
   }
   
 	int GAM[*p];
@@ -823,12 +840,13 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	fidGAM = fopen("GAM.txt", "w");
 	fprintf(fidGAM, "%d %d %d\n", *p, (*MCMC/ *thin), 0);    //store dimensions
 	
-	FILE *fidPi, *fidC, *fidlogprob, *fidnumneigh, *fidselect;
+	FILE *fidPi, *fidC, *fidlogprob, *fidnumneigh, *fidselect, *fidaccept;
     fidC = fopen("C.txt", "w");
     fidPi = fopen("Pi.txt", "w");
     fidlogprob = fopen("logprobs.txt", "w");
     fidnumneigh = fopen("numneighs.txt", "w");
     fidselect = fopen("selects.txt", "w");
+    fidaccept = fopen("acceptrates.txt", "w");
 	
 	for (int K = 0; K < *MCMC; K++) {
 		
@@ -837,10 +855,28 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);
 			
     //Sample C and update the px1 vector Pi
-    Pi_update(Pi, GAM, *C, d, *p, *k);
+    if(*Piupdate == 1){
+      Pi_update(Pi, GAM, *C, d, *p, *k);
     
-    C_update(C, Pi, GAM, d, *p, *k);
-	  //Rprintf("%.5e\n", *C);
+      if(*Cupdate == 1){
+        C_update(C, Pi, GAM, d, *p, *k, *CpropRange, accept_count);
+	      //Rprintf("%.5e\n", *C);
+    
+        if(!(K % 20) & (K < *burnin) & (K > 0)) {
+          if(accept_count[0] / 20.0 < 0.3){
+            *CpropRange = *CpropRange * 0.9;
+          }
+          if(accept_count[0] / 20.0 > 0.5){
+            *CpropRange = *CpropRange * 1.1;
+          }
+          //Rprintf("accept_rate %.3f\n", accept_count[0] / 20.0);
+          //Rprintf("CpropRange %.3f\n", *CpropRange);
+          fprintf(fidaccept, "%.4f ", accept_count[0] / 20.0);
+      
+          accept_count[0] = 0;
+        }
+      }
+    }
   
 		betaGAM_update(*n, *p, X,
 					   b, v, Pi,
@@ -878,6 +914,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	fclose(fidlogprob);
 	fclose(fidnumneigh);
 	fclose(fidselect);
+  fclose(fidaccept);
 	
 	PutRNGstate();	
 }
