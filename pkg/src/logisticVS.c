@@ -706,25 +706,7 @@ void LAMz_update(int n, int p, double *X, double *Y,
 	logprob[0] = logZ + logpriorLAM;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////
-void Pi_update(double *Pi, int *GAM, double C, double *d,  
-               int p, int k){
-  
-  double sum_d = 0.0;
-  for (int i = 0; i < p; i++){
-    sum_d += d[i];
-  }
-  
-  //Direct sampling:
-  double a[p];
-  double b[p];
-  for (int i = 0; i < p; i++) {
-    a[i] = C * k * p * d[i] + (1.0-C) * k * sum_d;
-    b[i] = p * sum_d - a[i];
-    
-    Pi[i] = rbeta(a[i]+GAM[i], b[i]+1.0-GAM[i]);
-  }
-}
+
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -778,11 +760,56 @@ void C_update(double *C, double *Pi, int *GAM, double *d,
   //Rprintf("%.5e %.5e\n", logdens_C, logdens_Cprop);
 }
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////
-void logisticVS(double *X, double *Y, int *n, int *p,
-				double *b, double *v, int *k, double *d,
-				int *block, int *MCMC, int *thins, double *CpropRange, 
-        int *Piupdate, int *Cupdate, int *burnin){
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+// alte version von Pi_update
+void Pi_update(double *Pi, int *GAM, double C, double *d,  
+               int p, int k){
+  
+  double sum_d = 0.0;
+  for (int i = 0; i < p; i++){
+    sum_d += d[i];
+  }
+  
+  //Direct sampling:
+  double a[p];
+  double b[p];
+  for (int i = 0; i < p; i++) {
+    a[i] = C * k * p * d[i] + (1.0-C) * k * sum_d;
+    b[i] = p * sum_d - a[i];
+    
+    Pi[i] = rbeta(a[i]+GAM[i], b[i]+1.0-GAM[i]);
+  }
+}
+
+
+// neue version von Pi_update
+void Pi_updatePara(double *Pi, int *GAM, double *aBeta, double *bBeta, int p){
+   //Direct sampling:
+  for (int i = 0; i < p; i++) {
+    Pi[i] = rbeta(aBeta[i]+GAM[i], bBeta[i]+1.0-GAM[i]);
+  }
+}
+
+
+
+
+//void logisticVS(double *X, double *Y, int *n, int *p,
+//    		double *b, double *v, int *k, double *d,
+//				int *block, int *MCMC, int *thins, double *CpropRange, 
+//        int *Piupdate, int *Cupdate, int *burnin){
+void logisticVSbeta(double *X, double *Y, int *n, int *p,
+  			double *b, double *v, double *aBeta, double *bBeta,
+				int *block, int *MCMC, int *thins, 
+        int *Piupdate, int *burnin){
 	
 	GetRNGstate();	
 	
@@ -799,23 +826,26 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	double logpostGAMbeta[1];
 	double logLAMz[1];
   
-  double sum_d = 0;
-  for (int i = 0; i < *p; i++){
-    sum_d += d[i];
-  }
+//  double sum_d = 0;
+//  for (int i = 0; i < *p; i++){
+//    sum_d += d[i];
+//  }
 	
-  double C[1];
-  C[0] = 1.0;
-  if(*Cupdate==1){
-    C[0] = runif(0.0, 1.0);
-  }
+//  double C[1];
+//  C[0] = 1.0;
+//  if(*Cupdate==1){
+//    C[0] = runif(0.0, 1.0);
+//  }
   
   double Pi[*p];
   for (int i = 0; i < *p; i++){
-    Pi[i] = (float)(*k) * d[i]/sum_d;
+//    Pi[i] = 10.0 / *p; // (aBeta[i] / (aBeta[i] + bBeta[i])); //(float)(*k) * d[i]/sum_d;
+    Pi[i] = (aBeta[i] / (aBeta[i] + bBeta[i])); //(float)(*k) * d[i]/sum_d;
   }
   
-	int GAM[*p];
+  Rprintf("pi start  %.3e\n", Pi[0]);
+  
+ 	int GAM[*p];
 	double beta[*p];
 	for (int i = 0; i < *p; i++) {
 		double U = runif(0.0, 1.0);
@@ -840,9 +870,10 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	fidGAM = fopen("GAM.txt", "w");
 	fprintf(fidGAM, "%d %d %d\n", *p, (*MCMC/ *thin), 0);    //store dimensions
 	
-	FILE *fidPi, *fidC, *fidlogprob, *fidnumneigh, *fidselect, *fidaccept;
-    fidC = fopen("C.txt", "w");
-    fidPi = fopen("Pi.txt", "w");
+//  FILE *fidPi, *fidC, *fidlogprob, *fidnumneigh, *fidselect, *fidaccept;
+  FILE *fidlogprob, *fidnumneigh, *fidselect, *fidaccept;
+ //   fidC = fopen("C.txt", "w");
+ //   fidPi = fopen("Pi.txt", "w");
     fidlogprob = fopen("logprobs.txt", "w");
     fidnumneigh = fopen("numneighs.txt", "w");
     fidselect = fopen("selects.txt", "w");
@@ -852,30 +883,32 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		
 		// Allow R interrupts; check every 10 iterations
 		if (!(K % 10)) R_CheckUserInterrupt();
-		if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);
+  //	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);
+  	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);
 			
     //Sample C and update the px1 vector Pi
     if(*Piupdate == 1){
-      Pi_update(Pi, GAM, *C, d, *p, *k);
+//      Pi_update(Pi, GAM, *C, d, *p, *k);
+      Pi_updatePara(Pi, GAM, aBeta, bBeta, *p);
     
-      if(*Cupdate == 1){
-        C_update(C, Pi, GAM, d, *p, *k, *CpropRange, accept_count);
-	      //Rprintf("%.5e\n", *C);
-    
-        if(!(K % 20) & (K < *burnin) & (K > 0)) {
-          if(accept_count[0] / 20.0 < 0.3){
-            *CpropRange = *CpropRange * 0.9;
-          }
-          if(accept_count[0] / 20.0 > 0.5){
-            *CpropRange = *CpropRange * 1.1;
-          }
-          //Rprintf("accept_rate %.3f\n", accept_count[0] / 20.0);
-          //Rprintf("CpropRange %.3f\n", *CpropRange);
-          fprintf(fidaccept, "%.4f ", accept_count[0] / 20.0);
+//      if(*Cupdate == 1){
+//        C_update(C, Pi, GAM, d, *p, *k, *CpropRange, accept_count);
+//	      //Rprintf("%.5e\n", *C);
+//    
+//        if(!(K % 20) & (K < *burnin) & (K > 0)) {
+//          if(accept_count[0] / 20.0 < 0.3){
+//            *CpropRange = *CpropRange * 0.9;
+//          }
+//          if(accept_count[0] / 20.0 > 0.5){
+//            *CpropRange = *CpropRange * 1.1;
+ //        }
+//          //Rprintf("accept_rate %.3f\n", accept_count[0] / 20.0);
+//          //Rprintf("CpropRange %.3f\n", *CpropRange);
+//          fprintf(fidaccept, "%.4f ", accept_count[0] / 20.0);
       
-          accept_count[0] = 0;
-        }
-      }
+//          accept_count[0] = 0;
+//        }
+//      }
     }
   
 		betaGAM_update(*n, *p, X,
@@ -895,20 +928,20 @@ void logisticVS(double *X, double *Y, int *n, int *p,
         	fprintf(fidselect, "%d ", select[0]);
 		
 			for (int i = 0; i < *p; i++) {
-        fprintf(fidPi, "%.10e\t", Pi[i]);
+  //      fprintf(fidPi, "%.10e\t", Pi[i]);
         
 				if (GAM[i] == 1){
 					fprintf(fidbeta, "%d %d %.10e\n", i+1, K2+1, beta[i]);
 					fprintf(fidGAM, "%d %d %d\n", i+1, K2+1, 1);
 				}
 			}
-      fprintf(fidPi, "\n");
-      fprintf(fidC, "%.6e\n", *C);
+  //    fprintf(fidPi, "\n");
+ //     fprintf(fidC, "%.6e\n", *C);
 		}
 	}
 	
-  fclose(fidC);
-  fclose(fidPi);
+//  fclose(fidC);
+//  fclose(fidPi);
 	fclose(fidbeta);
 	fclose(fidGAM);
 	fclose(fidlogprob);
@@ -918,3 +951,6 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	
 	PutRNGstate();	
 }
+
+
+

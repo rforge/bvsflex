@@ -1,5 +1,5 @@
-useDynLib("bvsflexBeta")
-export(logisticVSbeta)
+useDynLib("bvsflex")
+export(logisticVS)
 export(callBVS)
 export(callBVSelicit)
 export(callBVSelicit_d.noin)
