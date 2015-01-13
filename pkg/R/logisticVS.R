@@ -46,7 +46,7 @@ Piupdate <- ifelse(Piupdate==TRUE, 1, 0);
 #  Cupdate <- ifelse(Cupdate==TRUE, 1, 0);
   
   cat("Starting MCMC...\n");
-  .C("logisticVSbeta", 
+  .C("logisticVS", 
       X = as.double(X), Y = as.double(Y), n = as.integer(n), p = as.integer(p),
       b = as.double(b), v = as.double(v),
 #      k = as.integer(k), d = as.double(d),
@@ -57,7 +57,7 @@ Piupdate <- ifelse(Piupdate==TRUE, 1, 0);
       Piupdate = as.integer(Piupdate),
   #    Cupdate = as.integer(Cupdate),
       burnin = as.integer(burnin),
-      PACKAGE = "bvsflexBeta");   
+      PACKAGE = "bvsflex");   
    
   setwd(startdir);  
   return(outdir);
