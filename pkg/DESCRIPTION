@@ -10,9 +10,3 @@ Suggests:
 Description: The BVSflex package implements efficient Bayesian variable selection models for high-dimensional input data. A flexible selection prior allows the incorporation of additional information, e.g. a second data source including all sources of variation.
 License: GPL-2
 LazyLoad: yes
-Repository: R-Forge
-Repository/R-Forge/Project: bvsflex
-Repository/R-Forge/Revision: 21
-Repository/R-Forge/DateTimeStamp: 2014-08-11 10:03:42
-Date/Publication: 2014-08-11 10:03:42
-Packaged: 2014-11-27 13:10:51 UTC; wiesenfa

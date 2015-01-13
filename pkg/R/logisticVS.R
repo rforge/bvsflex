@@ -3,7 +3,7 @@
 #v0.2: Manuela Zucknick & Ana Corberan, 2014-05-05, last modified 2014-06-01
 #v0.24: Manuel Wiesenfarth, 27-11-2014
 
-logisticVSbeta <- function(X, Y, b, v, block=NULL, aBeta=NULL, bBeta=NULL,
+logisticVS <- function(X, Y, b, v, block=NULL, aBeta=NULL, bBeta=NULL,
                        MCMC, thinn=1, seed=1234, outdir=NULL, 
                        Piupdate=FALSE, burnin=NULL){
  
