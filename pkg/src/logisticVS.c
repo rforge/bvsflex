@@ -806,7 +806,7 @@ void Pi_updatePara(double *Pi, int *GAM, double *aBeta, double *bBeta, int p){
 //    		double *b, double *v, int *k, double *d,
 //				int *block, int *MCMC, int *thins, double *CpropRange, 
 //        int *Piupdate, int *Cupdate, int *burnin){
-void logisticVSbeta(double *X, double *Y, int *n, int *p,
+void logisticVS(double *X, double *Y, int *n, int *p,
   			double *b, double *v, double *aBeta, double *bBeta,
 				int *block, int *MCMC, int *thins, 
         int *Piupdate, int *burnin){
