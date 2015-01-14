@@ -3,8 +3,7 @@
 \title{Logistic Bayesian variable selection}
 \usage{
 logisticVS(X, Y, b, v, block = NULL, aBeta = NULL, bBeta = NULL, 
-    MCMC, thinn = 1, seed = 1234, outdir = NULL, Piupdate = FALSE, 
-    burnin = 0)
+    MCMC, thinn = 1, seed = 1234, outdir = NULL, Piupdate = FALSE)
 }
 \arguments{
  \item{X}{The input matrix of dimension n (no. samples) x p (no. variables).}
@@ -19,7 +18,6 @@ logisticVS(X, Y, b, v, block = NULL, aBeta = NULL, bBeta = NULL,
  \item{seed}{Random seed for reproducibility.}
  \item{outdir}{A character string specifying the directory for saving MCMC output files.}
  \item{Piupdate}{Should Pi be sampled according to a prior Beta distribution? The default is FALSE, which implies that Pi is assumed to be fixed as aBeta/(aBeta+bBeta).}
- \item{burnin}{Number of burnin samples. Default is 0.}
 }
 \description{
 The BVSflex package implements efficient Bayesian variable selection models for high-dimensional input data. A flexible selection prior allows the incorporation of additional information, e.g. a second data source including all sources of variation. 

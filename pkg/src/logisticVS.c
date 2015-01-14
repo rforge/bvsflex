@@ -948,7 +948,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 void logisticVS(double *X, double *Y, int *n, int *p,
   			double *b, double *v, double *aBeta, double *bBeta,
 				int *block, int *MCMC, int *thins, 
-        int *Piupdate, int *burnin){
+        int *Piupdate){
 	
 	GetRNGstate();	
 	

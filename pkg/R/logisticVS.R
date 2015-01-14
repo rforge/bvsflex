@@ -1,11 +1,11 @@
-#Logistic Bayesian variable selection (with 'singleGibbs' block Gibbs sampler for updating GAM and beta), with flexible variable selection prior Pi, allow input of (empirical) distribution for Pi in form of a matrix 
+#Logistic Bayesian variable selection (with 'singleGibbs' block Gibbs sampler for updating GAM and beta), with flexible variable selection prior Pi
 #v0.1: Manuela Zucknick, 2011-05-21, last modified 2013-12-12
 #v0.2: Manuela Zucknick & Ana Corberan, 2014-05-05, last modified 2014-06-01
-#v0.24: Manuel Wiesenfarth, 27-11-2014
+#v0.24/v0.25: Manuel Wiesenfarth, 27-11-2014, added to R-forge 2015-01-14
 
 logisticVS <- function(X, Y, b, v, block=NULL, aBeta=NULL, bBeta=NULL,
                        MCMC, thinn=1, seed=1234, outdir=NULL, 
-                       Piupdate=FALSE, burnin=0){
+                       Piupdate=FALSE){
  
   is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
   
@@ -56,7 +56,7 @@ Piupdate <- ifelse(Piupdate==TRUE, 1, 0);
   #    CpropRange = as.double(CpropRange),
       Piupdate = as.integer(Piupdate),
   #    Cupdate = as.integer(Cupdate),
-      burnin = as.integer(burnin),
+  #    burnin = as.integer(burnin),
       PACKAGE = "bvsflex");   
    
   setwd(startdir);  
