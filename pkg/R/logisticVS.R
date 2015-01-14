@@ -5,7 +5,7 @@
 
 logisticVS <- function(X, Y, b, v, block=NULL, aBeta=NULL, bBeta=NULL,
                        MCMC, thinn=1, seed=1234, outdir=NULL, 
-                       Piupdate=FALSE, burnin=NULL){
+                       Piupdate=FALSE, burnin=0){
  
   is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
   
@@ -44,7 +44,7 @@ if(is.null(bBeta)) bBeta <- rep(1, p);
 if(is.na(Piupdate)) stop("'Pipudate' should be either FALSE or TRUE (no missing values allowed).\n")
 Piupdate <- ifelse(Piupdate==TRUE, 1, 0);
 #  Cupdate <- ifelse(Cupdate==TRUE, 1, 0);
-  
+
   cat("Starting MCMC...\n");
   .C("logisticVS", 
       X = as.double(X), Y = as.double(Y), n = as.integer(n), p = as.integer(p),
