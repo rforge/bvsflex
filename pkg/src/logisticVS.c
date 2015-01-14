@@ -843,7 +843,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
     Pi[i] = (aBeta[i] / (aBeta[i] + bBeta[i])); //(float)(*k) * d[i]/sum_d;
   }
   
-  Rprintf("pi start  %.3e\n", Pi[0]);
+  Rprintf("Pi start = prior mean, e.g. Pi[1] = %.3e\n", Pi[0]);
   
  	int GAM[*p];
 	double beta[*p];
