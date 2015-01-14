@@ -12,13 +12,13 @@ logisticVS(X, Y, b, v, block = NULL, aBeta = NULL, bBeta = NULL,
  \item{b}{The prior mean vector of length p for beta.}
  \item{v}{A vector of length p with the diagonal elements of the (diagonal) prior covariance matrix for beta.}
  \item{block}{A (sparse) p x p matrix with entries <>0, if the corresponding two variables should be updated together (optional). The default is diag(1,p).}
- \item{aBeta}{Vector of prior parameters a[i] in Beta(a[i],b[i]) which is the prior distribution of Pi[i] (i = 1,...,p). The default is rep(1,p), which together with the default for bBeta implies a Uniform[0,1] prior distribution for all Pi[i].}
- \item{bBeta}{Vector of prior parameters b[i] in Beta(a[i],b[i]) which is the prior distribution of Pi[i] (i = 1,...,p). The default is rep(1,p).}
+ \item{aBeta}{Vector of prior parameters a[i] in Beta(a[i],b[i]) which is the prior distribution of Pi[i] (i = 1,...,p). The default is rep(1,p). Note, that together with the default for bBeta this implies a Uniform[0,1] prior distribution for all Pi[i], which might not be appropriate in very high-dimensional situations with p>>n. Ignored if Piupdate=FALSE.}
+ \item{bBeta}{Vector of prior parameters b[i] in Beta(a[i],b[i]) which is the prior distribution of Pi[i] (i = 1,...,p). The default is rep(1,p). Ignored if Piupdate=FALSE.}
  \item{MCMC}{Number of MCMC samples.}
  \item{thinn}{Thinning parameter. Every 'thinn'-ed MCMC iteration will be kept.}
  \item{seed}{Random seed for reproducibility.}
  \item{outdir}{A character string specifying the directory for saving MCMC output files.}
- \item{Piupdate}{Should Pi be sampled according to a hyper-prior Beta distribution? The default is FALSE, which implies that Pi is assumed to be fixed.}
+ \item{Piupdate}{Should Pi be sampled according to a prior Beta distribution? The default is FALSE, which implies that Pi is assumed to be fixed.}
  \item{burnin}{Number of burnin samples. Default is 0.}
 }
 \description{
@@ -52,7 +52,7 @@ res <- logisticVS(X, Y, b=rep(0,p), v=rep(1,p),
 require(Matrix)
 tmp <- read.table(paste(res, "GAM.txt", sep="/"))
 GAM <- as.matrix(sparseMatrix(i = tmp[,1], j = tmp[,2], x = tmp[,3]))
-image(y=1:p, x=1:B, z=t(GAM), col=c("white","black"), ylab="variables", 
+image(y=1:p, x=1:B, z=t(GAM), col=c("white","black"), ylab="Variables", 
       xlab="MCMC iteration", main="Trace plot for GAM")
 }
 }
