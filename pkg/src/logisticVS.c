@@ -771,6 +771,7 @@ void C_update(double *C, double *Pi, int *GAM, double *d,
 //////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 // alte version von Pi_update
+/*
 void Pi_update(double *Pi, int *GAM, double C, double *d,  
                int p, int k){
   
@@ -789,10 +790,11 @@ void Pi_update(double *Pi, int *GAM, double C, double *d,
     Pi[i] = rbeta(a[i]+GAM[i], b[i]+1.0-GAM[i]);
   }
 }
+*/
 
 
 // neue version von Pi_update
-void Pi_updatePara(double *Pi, int *GAM, double *aBeta, double *bBeta, int p){
+void Pi_update(double *Pi, int *GAM, double *aBeta, double *bBeta, int p){
    //Direct sampling:
   for (int i = 0; i < p; i++) {
     Pi[i] = rbeta(aBeta[i]+GAM[i], bBeta[i]+1.0-GAM[i]);
@@ -953,8 +955,6 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	int thin[1];
 	thin[0] = thins[0];
 	double T = 1.0;
-  int accept_count[1];
-  accept_count[0] = 0;
 	
 	int K2;
 	int numneigh[1];
@@ -995,11 +995,10 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	fidGAM = fopen("GAM.txt", "w");
 	fprintf(fidGAM, "%d %d %d\n", *p, (*MCMC/ *thin), 0);    //store dimensions
 	
-  FILE *fidlogprob, *fidnumneigh, *fidselect, *fidaccept;
+  FILE *fidlogprob, *fidnumneigh, *fidselect;
     fidlogprob = fopen("logprobs.txt", "w");
     fidnumneigh = fopen("numneighs.txt", "w");
     fidselect = fopen("selects.txt", "w");
-    fidaccept = fopen("acceptrates.txt", "w");
 	
 	for (int K = 0; K < *MCMC; K++) {
 		
@@ -1008,7 +1007,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
   	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);
 			
     if(*Piupdate == 1){
-      Pi_updatePara(Pi, GAM, aBeta, bBeta, *p);
+      Pi_update(Pi, GAM, aBeta, bBeta, *p);
     }
   
 		betaGAM_update(*n, *p, X,
@@ -1042,7 +1041,6 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	fclose(fidlogprob);
 	fclose(fidnumneigh);
 	fclose(fidselect);
-  fclose(fidaccept);
 	
 	PutRNGstate();	
 }
