@@ -126,19 +126,6 @@ double dmvnorm(double *Z, int n, double *Zmean, double *Zprec, char Log, int pga
 		Zchol[i] = Zprec[i];
 	}
 	
-	/*
-	if(pgam > n){
-	Rprintf("Zprecgam in dmvnorm:\n");
-	for (int i=0; i<(n*n); i++) {
-		Rprintf("%6.4f ", Zchol[i]);
-		if ((i+1)%n == 0) {
-			Rprintf("\n");
-		}
-	}
-	error("dmvnorm: Okay up to here.\n");
-	}
-	*/
-	
 	int info;
 	F77_NAME(dpotrf)(&Lower, &n, Zchol, &n, &info);
 	if(info != 0) error("Error in Lapack function dpotrf, while computing Zchol.\n");
@@ -175,7 +162,10 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 	}
 	double dsqrtinvLAM[(n * n)];
 	diagonalize(sqrtinvLAM, n, dsqrtinvLAM);
-	
+	  
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:
+
 	// Up to here, LAM and vgam are still vectors. Convert to diagonal matrices.
 	double dvgam[(pgam * pgam)];
 	diagonalize(vgam, pgam, dvgam);
@@ -216,8 +206,11 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		
 		double sqrtinvLAMXgam[(n * pgam)];
 		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &n, &oned, dsqrtinvLAM, &n, Xgam, &n, &zerod, sqrtinvLAMXgam, &n);
-		
-		// 1) compute t(X)%*%LAM%*%X, 2) add 1/vgam[i] to diagonal elements, 
+
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:
+
+		// 1) compute t(X)%*%invLAM%*%X, 2) add 1/vgam[i] to diagonal elements, 
 		// 3) compute inverse (first cholesky decomposition, then inverse from that).
 		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &zerod, Vtmp, &pgam);		
 		
@@ -230,6 +223,10 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		Vgam[i] = Vtmp[i];
 	}
 	
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:
+//need to change (only the first) dgemv do dgemm...
+  
 	//Bgam = Vgam %*% (invvgam%*%bgam + tXgam%*%invLAM%*%Z);
 	double Btmp[pgam];
 	double invvbgam_XinvLAMZ[pgam];	//for now this is only invvgam%*%bgam
@@ -322,6 +319,8 @@ void betaGAM_update(int n, int p, double *X,
 	double Xgam[(pgam * n)];
 	matrixSubset(X, GAM, n, p, Xgam);
 	
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:  
 	double vgam[pgam];
 	vectorSubset(v, GAM, p, vgam);
 	
@@ -376,7 +375,9 @@ void betaGAM_update(int n, int p, double *X,
 			
 			double Xtry[(ptry * n)];
 			matrixSubset(X, GAMtry, n, p, Xtry);
-			
+
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:
 			double vtry[ptry];
 			vectorSubset(v, GAMtry, p, vtry);
 			
@@ -416,7 +417,9 @@ void betaGAM_update(int n, int p, double *X,
 	
 	double Xstar[(pstar * n)];
 	matrixSubset(X, GAMstar, n, p, Xstar);
-	
+
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:
 	double vstar[pstar];
 	vectorSubset(v, GAMstar, p, vstar);
 	
@@ -473,7 +476,9 @@ void betaGAM_update(int n, int p, double *X,
 			Vprec[i] = Vstar[i];
 		}
 		matrixInverse(Vprec, pstar);  //input Vstar, output inverse(Vstar)
-		
+
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:
 		double vprec[pstar];
 		for (int i = 0; i < pstar; i++) {
 			vprec[i] = 1.0/vstar[i];
@@ -621,7 +626,7 @@ double lambdadist_temp(double r, double T)
 	
 	// Global constants that are needed often,
 	// compute only once here to save computing time
-	double Tr = (1/T) * r;
+	double Tr = (1.0/T) * r;
 	
 	double LAMlocal = 0;
 	double Y;
@@ -635,7 +640,7 @@ double lambdadist_temp(double r, double T)
 			Y = Y * Y;
 			Y = 1 + (Y - sqrt(Y*(4*r + Y)))/(2*r);
 			U = runif(0.0, 1.0);
-			if(U <= 1/(1 + Y)){
+			if(U <= 1.0/(1.0 + Y)){
 				if(Y == 0){
 					Y = DBL_EPSILON;
 				}
@@ -760,15 +765,6 @@ void C_update(double *C, double *Pi, int *GAM, double *d,
   //Rprintf("%.5e %.5e\n", logdens_C, logdens_Cprop);
 }
 
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
 // alte version von Pi_update
 /*
@@ -791,6 +787,7 @@ void Pi_update(double *Pi, int *GAM, double C, double *d,
   }
 }
 */
+//////////////////////////////////////////////////////////////////////////////////////////////
 
 
 // neue version von Pi_update
@@ -801,154 +798,29 @@ void Pi_update(double *Pi, int *GAM, double *aBeta, double *bBeta, int p){
   }
 }
 
-
-/* Old version (with d, k and C):
-void logisticVS(double *X, double *Y, int *n, int *p,
-      	double *b, double *v, int *k, double *d,
-				int *block, int *MCMC, int *thins, double *CpropRange, 
-        int *Piupdate, int *Cupdate, int *burnin){
-	
-	GetRNGstate();	
-	
-	int thin[1];
-	thin[0] = thins[0];
-	double T = 1.0;
-  int accept_count[1];
-  accept_count[0] = 0;
-	
-	int K2;
-	int numneigh[1];
-	int select[1];
-	double logpriorGAMbeta[1];
-	double logpostGAMbeta[1];
-	double logLAMz[1];
-  
-  double sum_d = 0;
-  for (int i = 0; i < *p; i++){
-    sum_d += d[i];
-  }
-	
-  double C[1];
-  C[0] = 1.0;
-  if(*Cupdate==1){
-    C[0] = runif(0.0, 1.0);
-  }
-  
-  double Pi[*p];
-  for (int i = 0; i < *p; i++){
-    Pi[i] = (float)(*k) * d[i]/sum_d;
-  }
-  
- 	int GAM[*p];
-	double beta[*p];
-	for (int i = 0; i < *p; i++) {
-		double U = runif(0.0, 1.0);
-		GAM[i] = (U < Pi[i] ? 1 : 0);
-		beta[i] = 0.0;
-	}
-	
-	double LAM[*n];
-	double Z[*n];
-	for (int j = 0; j < *n; j++) {
-		double U2 = fabs(rnorm(0.0, 1.0));
-		Z[j] = (Y[j] > 0.0 ? U2 : -U2);
-		LAM[j] = 1;
-	}
-	
-	//save in sparse matrix form (col1=rowID, col2=colID, col3=beta):
-	FILE *fidbeta;
-	fidbeta = fopen("beta.txt", "w");
-	fprintf(fidbeta, "%d %d %.10e\n", *p, (*MCMC/ *thin), 0.0);    //store dimensions
-	
-	FILE *fidGAM;
-	fidGAM = fopen("GAM.txt", "w");
-	fprintf(fidGAM, "%d %d %d\n", *p, (*MCMC/ *thin), 0);    //store dimensions
-	
-  FILE *fidPi, *fidC, *fidlogprob, *fidnumneigh, *fidselect, *fidaccept;
-    fidC = fopen("C.txt", "w");
-    fidPi = fopen("Pi.txt", "w");
-    fidlogprob = fopen("logprobs.txt", "w");
-    fidnumneigh = fopen("numneighs.txt", "w");
-    fidselect = fopen("selects.txt", "w");
-    fidaccept = fopen("acceptrates.txt", "w");
-	
-	for (int K = 0; K < *MCMC; K++) {
-		
-		// Allow R interrupts; check every 10 iterations
-		if (!(K % 10)) R_CheckUserInterrupt();
-  	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);
-			
-    //Sample C and update the px1 vector Pi
-    if(*Piupdate == 1){
-      Pi_update(Pi, GAM, *C, d, *p, *k);
-    
-      if(*Cupdate == 1){
-        C_update(C, Pi, GAM, d, *p, *k, *CpropRange, accept_count);
-	      //Rprintf("%.5e\n", *C);
-    
-        if(!(K % 20) & (K < *burnin) & (K > 0)) {
-          if(accept_count[0] / 20.0 < 0.3){
-            *CpropRange = *CpropRange * 0.9;
-          }
-          if(accept_count[0] / 20.0 > 0.5){
-            *CpropRange = *CpropRange * 1.1;
-         }
-          //Rprintf("accept_rate %.3f\n", accept_count[0] / 20.0);
-          //Rprintf("CpropRange %.3f\n", *CpropRange);
-          fprintf(fidaccept, "%.4f ", accept_count[0] / 20.0);
-      
-          accept_count[0] = 0;
-        }
-      }
-    }
-  
-		betaGAM_update(*n, *p, X,
-					   b, v, Pi,
-					   beta, GAM, LAM, Z,
-					   block, T, numneigh, select, logpriorGAMbeta, logpostGAMbeta);
-		
-		LAMz_update(*n, *p, X, Y,
-					beta, GAM, LAM, Z,
-					T, logLAMz);
-		
-		if (!(K % *thin)) {
-			K2 = K / *thin;
-		
-        	fprintf(fidlogprob, "%.4f ", logpriorGAMbeta[0] + logLAMz[0]);
-        	fprintf(fidnumneigh, "%d ", numneigh[0]);
-        	fprintf(fidselect, "%d ", select[0]);
-		
-			for (int i = 0; i < *p; i++) {
-        fprintf(fidPi, "%.10e\t", Pi[i]);
-        
-				if (GAM[i] == 1){
-					fprintf(fidbeta, "%d %d %.10e\n", i+1, K2+1, beta[i]);
-					fprintf(fidGAM, "%d %d %d\n", i+1, K2+1, 1);
-				}
-			}
-      fprintf(fidPi, "\n");
-      fprintf(fidC, "%.6e\n", *C);
-		}
-	}
-	
-  fclose(fidC);
-  fclose(fidPi);
-	fclose(fidbeta);
-	fclose(fidGAM);
-	fclose(fidlogprob);
-	fclose(fidnumneigh);
-	fclose(fidselect);
-  fclose(fidaccept);
-	
-	PutRNGstate();	
+// class of inverse gamma priors for g:
+void g_update_IG(double *g, double aG, double bG){
+   *g = 1.0 / rgamma(aG, 1.0 / bG); 
+   //Note: Rmath.h rgamma uses shape and rate parameters, while 
+   //rgamma() in R uses shape and scale parameters per default and 
+   //aG and bG are meant as shape and scale parameters.
 }
-*/
+// hyper-g prior for g according to Liang et al. (2008) 
+// (use g/(1+g) ~ Beta formulation):
+void g_update_hyperg(double *g, double aG){
+   double gratio = rbeta(1.0, 0.5 * aG - 1.0);
+   *g = 1.0 / (1.0 / gratio - 1.0);
+}
 
-//New version (with aBeta and bBeta)
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//New version (with aBeta and bBeta and allowing for hyper-prior for g)
 void logisticVS(double *X, double *Y, int *n, int *p,
-  			double *b, double *v, double *aBeta, double *bBeta,
+  			double *b, double *v0, double *g, 
+        double *aBeta, double *bBeta,
+        double *aG, double *bG,
 				int *block, int *MCMC, int *thins, 
-        int *Piupdate){
+        int *Piupdate, int *gupdate){
 	
 	GetRNGstate();	
 	
@@ -967,7 +839,6 @@ void logisticVS(double *X, double *Y, int *n, int *p,
   for (int i = 0; i < *p; i++){
     Pi[i] = (aBeta[i] / (aBeta[i] + bBeta[i]));
   }
-  
   Rprintf("Starting Pi with prior mean, e.g. Pi[1] = %.3e\n", Pi[0]);
   
  	int GAM[*p];
@@ -977,6 +848,10 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		GAM[i] = (U < Pi[i] ? 1 : 0);
 		beta[i] = 0.0;
 	}
+  
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:  
+  double v[*p];
 	
 	double LAM[*n];
 	double Z[*n];
@@ -995,17 +870,34 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	fidGAM = fopen("GAM.txt", "w");
 	fprintf(fidGAM, "%d %d %d\n", *p, (*MCMC/ *thin), 0);    //store dimensions
 	
-  FILE *fidlogprob, *fidnumneigh, *fidselect;
+  FILE *fidlogprob, *fidnumneigh, *fidselect, *fidg; //*fidpi;
     fidlogprob = fopen("logprobs.txt", "w");
     fidnumneigh = fopen("numneighs.txt", "w");
     fidselect = fopen("selects.txt", "w");
+    fidg = fopen("g.txt", "w");
+    //fidpi = fopen("pi.txt", "w");
 	
 	for (int K = 0; K < *MCMC; K++) {
 		
 		// Allow R interrupts; check every 10 iterations
 		if (!(K % 10)) R_CheckUserInterrupt();
   	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);
-			
+			  
+    if(*gupdate == 1){
+      //class of inverse-gamma priors
+      g_update_IG(g, *aG, *bG);
+    }
+    if(*gupdate == 2){
+      //class of inverse-gamma priors
+      g_update_hyperg(g, *aG);
+    }
+    
+/////////////////////////////////////////////////////////////////////////
+//This needs to change if v is not necessarily a diagonal matrix anymore:    
+    for (int i = 0; i < *p; i++) {
+		  v[i] = *g * v0[i];
+	  } 
+      
     if(*Piupdate == 1){
       Pi_update(Pi, GAM, aBeta, bBeta, *p);
     }
@@ -1021,7 +913,9 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		
 		if (!(K % *thin)) {
 			K2 = K / *thin;
-		
+		      
+          //fprintf(fidpi, "%.4f ", Pi[0]);
+          fprintf(fidg, "%.4f ", g[0]);
         	fprintf(fidlogprob, "%.4f ", logpriorGAMbeta[0] + logLAMz[0]);
         	fprintf(fidnumneigh, "%d ", numneigh[0]);
         	fprintf(fidselect, "%d ", select[0]);
@@ -1036,6 +930,8 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		}
 	}
 	
+  //fclose(fidpi);
+  fclose(fidg);
 	fclose(fidbeta);
 	fclose(fidGAM);
 	fclose(fidlogprob);
