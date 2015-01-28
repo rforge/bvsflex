@@ -10,7 +10,7 @@ logisticVS(X, Y, b, v, g = 1, block = NULL,
  \item{X}{The input matrix with n rows (no. samples) and p columns (no. variables).}
  \item{Y}{The binary response vector of length n with elements in \{0, 1\}.}
  \item{b}{The prior mean vector for beta, of length p.}
- \item{v}{The diagonal prior covariance matrix for beta, as a vector of length p.}
+ \item{v}{The prior covariance matrix for beta. This can be a vector of length p to be interpreted as the diagonal of a diagonal matrix, or it can be a matrix of dimension p x p.}
  \item{g}{The hyper-parameter g for the prior covariance matrix for beta (a scalar). The default is 1. Ignored if gupdate <> "none".}
  \item{block}{A (sparse) p x p matrix with entries <> 0, if the corresponding two variables should be updated together (optional). The default is diag(1,p).}
  \item{aBeta}{Vector of prior parameters a[i] in Beta(a[i],b[i]) which is the prior distribution of Pi[i] (i = 1,...,p). The default is rep(1,p). Note, that together with the default for bBeta this implies a Uniform[0,1] prior distribution for all Pi[i], which might not be appropriate in very high-dimensional situations with p>>n. If Piupdate=FALSE this implies that a fixed Pi[i]=0.5 is assumed for i = 1,...,p.}

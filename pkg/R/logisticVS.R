@@ -2,7 +2,8 @@
 #v0.1: Manuela Zucknick, 2011-05-21, last modified 2013-12-12
 #v0.2: Manuela Zucknick & Ana Corberan, 2014-05-05, last modified 2014-06-01
 #v0.24/v0.25: Manuel Wiesenfarth, 2014-11-27, added to R-forge 2015-01-14
-#v0.3: Manuela Zucknick, 2015-01-26
+#v0.3: Manuela Zucknick, 2015-01-26 (add prior distributions for g)
+#v0.31: Manuela Zucknick, 2015-01-28 (add non-diagonal v)
 
 logisticVS <- function(X, Y, b, v, g=1, block=NULL, 
                        aBeta=NULL, bBeta=NULL,
@@ -27,10 +28,16 @@ logisticVS <- function(X, Y, b, v, g=1, block=NULL,
   
   if(is.null(block)) block <- diag(1,p);
   
-  if(length(Y) != n) stop("Length of Y has to be the same as nrow(X) = n.\n");
+  if(length(Y) != n) stop("Length of Y has to be n = nrow(X).\n");
   if(all(sort(unique(Y)) != c(0,1))) stop("The class vector Y should always contain both 0's and 1's (and only these values).\n");
-  if(length(b) != p) stop("Length of b has to be the same as ncol(X) = p.\n");
-  if(length(v) != p) stop("Length of v has to be the same as ncol(X) = p.\n");
+  if(length(b) != p) stop("Length of b has to be p = ncol(X).\n");
+  if(is.vector(v)){
+    if(length(v) != p) stop("If v is a vector, length of v has to be p = ncol(X).\n");
+  }else{
+    if(!is.matrix(v) | ncol(v) != p | nrow(v) != p){
+      stop("If v is not a vector, it has to be a matrix of dimension p x p, where p = ncol(X).\n");
+    }
+  }
   if(length(g) != 1) stop("g should be a scalar.\n");
   if(ncol(block) != p | nrow(block) != p) stop("Dimension of 'block' has to be p x p, where p = ncol(X).\n");
   
@@ -52,6 +59,9 @@ logisticVS <- function(X, Y, b, v, g=1, block=NULL,
   if(gupdate == "IG") gupdate.int <- 1;
   if(gupdate == "hyperg") gupdate.int <- 2;
 
+  #if v is a vector, make a diagonal matrix out of it:
+  if(is.vector(v)) v <- diag(v);
+  
   #Center X[,j] (j=1,...,p) and Y (because we don't have an intercept in the model):
   Xs <- scale(X, scale=FALSE);
   Ys <- scale(Y, scale=FALSE);

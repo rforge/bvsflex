@@ -76,16 +76,14 @@ void matrixRow(double *X, int n, int p, int *j, double *Xj){
     }
 }
 
-
 void matrixSubset(double *X, int *GAM, int n, int p, double *Xgam){
-	//GAM is binary indicator vector of length p, indicating which columns of X go keep in Xgam.
+	//GAM is binary indicator vector of length p, indicating which columns of X to keep in Xgam.
 	//X is matrix of dim nxp.
 	
-	int j;
-	int igam = 0;	//for counting through those elements of GAM that are 1
+	int igam = 0;	//for counting through elements of GAM that are 1
 	for (int i=0; i<p; i++) {
 		if (GAM[i] == 1) {
-			for(j=0; j<n; j++){
+			for (int j=0; j<n; j++){
 				Xgam[j + n*igam] = X[j + n*i];
 			}
 			igam = igam + 1;
@@ -93,8 +91,28 @@ void matrixSubset(double *X, int *GAM, int n, int p, double *Xgam){
 	}
 }
 
+void matrixSubsetRows(double *X, int *GAM, int p, int n, double *Xgam){
+  //GAM is binary indicator vector of length p, indicating which rows of X to keep in Xgam.
+	//X is matrix of dim pxn.
+		  
+  int pgam = 0;
+  for (int k = 0; k < p; k++) {
+		pgam += GAM[k];
+	}
+    
+  for (int i=0; i<n; i++){
+    int jgam = 0;  //for counting through elements of GAM that are 1 (start again with each new column)
+	  for (int j=0; j<p; j++) {
+		  if (GAM[j] == 1) {
+				Xgam[jgam + pgam*i] = X[j + p*i];
+        jgam = jgam + 1;
+			}
+		}
+	}
+}
+
 void vectorSubset(double *y, int *GAM, int p, double *ygam){
-	//GAM is binary indicator vector of length p, indicating which elements of y go keep in ygam.
+	//GAM is binary indicator vector of length p, indicating which elements of y to keep in ygam.
 	//y is vector of length p.
 	
 	int igam = 0;	//for counting through those elements of GAM that are 1
@@ -162,16 +180,15 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 	}
 	double dsqrtinvLAM[(n * n)];
 	diagonalize(sqrtinvLAM, n, dsqrtinvLAM);
-	  
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:
-
-	// Up to here, LAM and vgam are still vectors. Convert to diagonal matrices.
-	double dvgam[(pgam * pgam)];
-	diagonalize(vgam, pgam, dvgam);
 	
 	double dLAM[(n * n)];
 	diagonalize(LAM, n, dLAM);
+  
+  double invvgam[(pgam * pgam)];
+    for (int i=0; i<(pgam * pgam); i++) {
+    	invvgam[i] = vgam[i]; 
+		}
+  matrixInverse(invvgam, pgam); //input = vgam, output = invvgam
 	
 	double Vtmp[(pgam * pgam)];
 
@@ -180,7 +197,7 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		//Vtmp = vgam - vgam%*%t(Xgam)%*%solve(LAM + Xgam%*%vgam%*%t(Xgam))%*%Xgam%*%vgam;
 		
 		double Xvgam[(n * pgam)];
-		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &pgam, &oned, Xgam, &n, dvgam, &pgam, &zerod, Xvgam, &n);
+		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &pgam, &oned, Xgam, &n, vgam, &pgam, &zerod, Xvgam, &n);
  
 		double LAM_XvXgam[(n * n)]; //input = dLAM, output = LAMXvXgam
 		diagonalize(LAM, n, LAM_XvXgam);
@@ -191,12 +208,12 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		for (int i=0; i<(n * pgam); i++) {
 			invLAMXvX_Xvgam[i] = Xvgam[i];
 		}
-		
 		F77_NAME(dposv)(&Upper, &n, &pgam, LAM_XvXgam, &n, invLAMXvX_Xvgam, &n, &info);
 		if(info != 0) error("Error in Lapack function dposv, while computing invLAMXvX. Error %d\n",info);
-		
-		diagonalize(vgam, pgam, Vtmp); //input = vgam, output = Vtmp
-		
+    
+  	for (int i=0; i<(pgam * pgam); i++) {
+			Vtmp[i] = vgam[i]; //input = vgam, output = Vtmp
+		}
 		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &moned, Xvgam, &n, invLAMXvX_Xvgam, &n, &oned, Vtmp, &pgam);
 		
 	}else{
@@ -207,32 +224,24 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		double sqrtinvLAMXgam[(n * pgam)];
 		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &n, &oned, dsqrtinvLAM, &n, Xgam, &n, &zerod, sqrtinvLAMXgam, &n);
 
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:
-
-		// 1) compute t(X)%*%invLAM%*%X, 2) add 1/vgam[i] to diagonal elements, 
+		// 1) compute t(X)%*%invLAM%*%X, 2) add invvgam, 
 		// 3) compute inverse (first cholesky decomposition, then inverse from that).
 		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &zerod, Vtmp, &pgam);		
-		
-		for (int i=0; i<pgam; i++) {
-			Vtmp[(pgam+1) * i] += 1.0/vgam[i];
+    
+		for (int i=0; i<(pgam * pgam); i++) {
+			Vtmp[i] += invvgam[i];
 		}
 		matrixInverse(Vtmp, pgam);
 	}
 	for (int i=0; i<(pgam * pgam); i++) {
 		Vgam[i] = Vtmp[i];
 	}
-	
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:
-//need to change (only the first) dgemv do dgemm...
   
 	//Bgam = Vgam %*% (invvgam%*%bgam + tXgam%*%invLAM%*%Z);
-	double Btmp[pgam];
-	double invvbgam_XinvLAMZ[pgam];	//for now this is only invvgam%*%bgam
-	for (int i=0; i<pgam; i++) {
-		invvbgam_XinvLAMZ[i] = (1.0/vgam[i]) * bgam[i];
-	}
+	double invvbgam_XinvLAMZ[pgam];
+  F77_NAME(dgemv)(&NoTrans, &pgam, &pgam, &oned, invvgam, &pgam, bgam, &one, &zerod, invvbgam_XinvLAMZ, &one);  
+  // up to here "invvbgam_XinvLAMZ" is actually only invvgam%*%bgam
+  
 	double invLAMZ[n];
 	for (int j=0; j<n; j++) {
 		invLAMZ[j] = (1.0/LAM[j]) * Z[j];
@@ -240,6 +249,7 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 	F77_NAME(dgemv)(&Trans, &n, &pgam, &oned, Xgam, &n, invLAMZ, &one, &oned, invvbgam_XinvLAMZ, &one); 
 	// here invvbgam_XinvLAMZ is updated to include everything that is multiplied with Vgam resulting in Bgam
 	
+  double Btmp[pgam];
 	F77_NAME(dgemv)(&Trans, &pgam, &pgam, &oned, Vgam, &pgam, invvbgam_XinvLAMZ, &one, &zerod, Btmp, &one);	
 	for (int i=0; i<pgam; i++) {
 		Bgam[i] = Btmp[i];
@@ -318,11 +328,10 @@ void betaGAM_update(int n, int p, double *X,
 	
 	double Xgam[(pgam * n)];
 	matrixSubset(X, GAM, n, p, Xgam);
-	
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:  
-	double vgam[pgam];
-	vectorSubset(v, GAM, p, vgam);
+  
+  double vtmpgam[(p * pgam)], vgam[(pgam * pgam)];
+  matrixSubset(v, GAM, p, p, vtmpgam); //matrixSubset subsets wrt. columns
+  matrixSubsetRows(vtmpgam, GAM, p, pgam, vgam); //matrixSubsetRows subsets wrt. rows
 	
 	double bgam[pgam];
 	vectorSubset(b, GAM, p, bgam);
@@ -340,7 +349,7 @@ void betaGAM_update(int n, int p, double *X,
 	//GAMstar in previous iteration, only compute the other one = GAMtry)
 	
 	//find variables to update together with GAM(select) (= neighbours)
-    select[0] = p * unif_rand(); //random sample from 0:(p-1)
+  select[0] = p * unif_rand(); //random sample from 0:(p-1)
 	int neighbour[p];
 	numneigh[0] = 0;
 	for (int i = (select[0] * p); i < ((select[0]+1) * p); i++) {
@@ -375,12 +384,11 @@ void betaGAM_update(int n, int p, double *X,
 			
 			double Xtry[(ptry * n)];
 			matrixSubset(X, GAMtry, n, p, Xtry);
-
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:
-			double vtry[ptry];
-			vectorSubset(v, GAMtry, p, vtry);
 			
+      double vtmptry[(p * ptry)], vtry[(ptry * ptry)];
+      matrixSubset(v, GAMtry, p, p, vtmptry); //matrixSubset subsets wrt. columns
+      matrixSubsetRows(vtmptry, GAMtry, p, ptry, vtry); //matrixSubsetRows subsets wrt. rows
+      
 			double btry[ptry];
 			vectorSubset(b, GAMtry, p, btry);
 			
@@ -418,10 +426,9 @@ void betaGAM_update(int n, int p, double *X,
 	double Xstar[(pstar * n)];
 	matrixSubset(X, GAMstar, n, p, Xstar);
 
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:
-	double vstar[pstar];
-	vectorSubset(v, GAMstar, p, vstar);
+	double vtmpstar[(p * pstar)], vstar[(pstar * pstar)];
+	matrixSubset(v, GAMstar, p, p, vtmpstar); //matrixSubset subsets wrt. columns
+  matrixSubsetRows(vtmpstar, GAMstar, p, pstar, vstar); //matrixSubsetRows subsets wrt. rows
 	
 	double bstar[pstar];
 	vectorSubset(b, GAMstar, p, bstar);
@@ -471,22 +478,19 @@ void betaGAM_update(int n, int p, double *X,
 	
 	double logpriorbeta = 0.0, logpostbeta = 0.0; //P(beta=empty|GAM,Z,LAM) = 1 (if pgam = 0)
 	if (pstar > 0){
-		double Vprec[(pstar * pstar)], dvprec[(pstar * pstar)];
+		double Vprec[(pstar * pstar)], vprec[(pstar * pstar)];
 		for (int i = 0; i < (pstar * pstar); i++) {
 			Vprec[i] = Vstar[i];
 		}
 		matrixInverse(Vprec, pstar);  //input Vstar, output inverse(Vstar)
-
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:
-		double vprec[pstar];
-		for (int i = 0; i < pstar; i++) {
-			vprec[i] = 1.0/vstar[i];
+    
+    for (int i = 0; i < (pstar * pstar); i++) {
+  		vprec[i] = vstar[i];
 		}
-		diagonalize(vprec, pstar, dvprec);
+		matrixInverse(vprec, pstar);  //input vstar, output inverse(vstar)
 		
 		logpostbeta = dmvnorm(betastar, pstar, Bstar, Vprec, Log, pstar);
-		logpriorbeta = dmvnorm(betastar, pstar, bgam, dvprec, Log, pstar);
+		logpriorbeta = dmvnorm(betastar, pstar, bgam, vprec, Log, pstar);
 	}
   
 	logprior[0] = logpriorGAM + logpriorbeta;
@@ -848,10 +852,8 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		GAM[i] = (U < Pi[i] ? 1 : 0);
 		beta[i] = 0.0;
 	}
-  
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:  
-  double v[*p];
+   
+  double v[(*p * *p)];
 	
 	double LAM[*n];
 	double Z[*n];
@@ -891,10 +893,8 @@ void logisticVS(double *X, double *Y, int *n, int *p,
       //class of inverse-gamma priors
       g_update_hyperg(g, *aG);
     }
-    
-/////////////////////////////////////////////////////////////////////////
-//This needs to change if v is not necessarily a diagonal matrix anymore:    
-    for (int i = 0; i < *p; i++) {
+      
+    for (int i = 0; i < (*p * *p); i++) {
 		  v[i] = *g * v0[i];
 	  } 
       
