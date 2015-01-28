@@ -716,85 +716,8 @@ void LAMz_update(int n, int p, double *X, double *Y,
 }
 
 
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-void C_update(double *C, double *Pi, int *GAM, double *d,
-              int p, int k, double CpropRange, int *accept_count){
-
-  double sum_d = 0;
-  for (int i = 0; i < p; i++){
-    sum_d += d[i];
-  }
-
-  //Propose new C' (if Cprop.range==0 sample from uniform(0,1), otherwise sample from (max{0, C' - 0.2}, min{C' + 0.2, 1})):
-  double Cprop;
-  Cprop = runif(fmax(0.0, *C-CpropRange), fmin(*C+CpropRange, 1.0));
-
-  double aprop[p];
-  double bprop[p];
-  double a[p];
-  double b[p];
-  for (int i = 0; i < p; i++){
-    aprop[i] = Cprop * k * p * d[i] + (1.0-Cprop) * k * sum_d;
-    bprop[i] = p * sum_d - aprop[i];
-    
-    a[i] = *C * k * p * d[i] + (1.0 - *C) * k * sum_d;
-    b[i] = p * sum_d - a[i];
-  }
-  
-  //Compute density for proposed C':
-  double logdens_Cprop = 0.0;
-  for (int i = 0; i < p; i++){
-    logdens_Cprop += dbeta(Pi[i], aprop[i]+GAM[i], bprop[i]+1.0-GAM[i], 1);
-  }
-  
-  //Compute density for actual C:
-  double logdens_C = 0.0;
-  for (int i = 0; i < p; i++){
-    logdens_C += dbeta(Pi[i], a[i]+GAM[i], b[i]+1.0-GAM[i], 1);
-  }
-  
-  double dens_ratio = exp(logdens_Cprop - logdens_C);
-  double accept_prob = fmin(1.0, dens_ratio);
-  
-  double U = runif(0.0, 1.0);
-  if(U < accept_prob){
-    *C = Cprop;
-    
-    *accept_count = *accept_count + 1;
-  }
-  
-  //Rprintf("%.5e %.5e %.5e\n", *C, Cprop, accept_prob);
-  //Rprintf("%.5e %.5e\n", logdens_C, logdens_Cprop);
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-// alte version von Pi_update
-/*
-void Pi_update(double *Pi, int *GAM, double C, double *d,  
-               int p, int k){
-  
-  double sum_d = 0.0;
-  for (int i = 0; i < p; i++){
-    sum_d += d[i];
-  }
-  
-  //Direct sampling:
-  double a[p];
-  double b[p];
-  for (int i = 0; i < p; i++) {
-    a[i] = C * k * p * d[i] + (1.0-C) * k * sum_d;
-    b[i] = p * sum_d - a[i];
-    
-    Pi[i] = rbeta(a[i]+GAM[i], b[i]+1.0-GAM[i]);
-  }
-}
-*/
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-
-// neue version von Pi_update
 void Pi_update(double *Pi, int *GAM, double *aBeta, double *bBeta, int p){
    //Direct sampling:
   for (int i = 0; i < p; i++) {
