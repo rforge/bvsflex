@@ -5,7 +5,7 @@
 #v0.3: Manuela Zucknick, 2015-01-26 (add prior distributions for g)
 #v0.31/v0.32: Manuela Zucknick, 2015-01-28 (add non-diagonal v), debugging 2015-02-04
 
-logisticVS <- function(X, Y, b, v, g=1, block=NULL, 
+logisticVS <- function(X, Y, b, v0, g=1, block=NULL, 
                        aBeta=NULL, bBeta=NULL,
                        aG=NULL, bG=NULL,
                        MCMC, thinn=1, seed=1234, outdir=NULL, 
@@ -31,11 +31,11 @@ logisticVS <- function(X, Y, b, v, g=1, block=NULL,
   if(length(Y) != n) stop("Length of Y has to be n = nrow(X).\n");
   if(all(sort(unique(Y)) != c(0,1))) stop("The class vector Y should always contain both 0's and 1's (and only these values).\n");
   if(length(b) != p) stop("Length of b has to be p = ncol(X).\n");
-  if(is.vector(v)){
-    if(length(v) != p) stop("If v is a vector, length of v has to be p = ncol(X).\n");
+  if(is.vector(v0)){
+    if(length(v0) != p) stop("If v0 is a vector, length of v0 has to be p = ncol(X).\n");
   }else{
-    if(!is.matrix(v) | ncol(v) != p | nrow(v) != p){
-      stop("If v is not a vector, it has to be a matrix of dimension p x p, where p = ncol(X).\n");
+    if(!is.matrix(v0) | ncol(v0) != p | nrow(v0) != p){
+      stop("If v0 is not a vector, it has to be a matrix of dimension p x p, where p = ncol(X).\n");
     }
   }
   if(length(g) != 1) stop("g should be a scalar.\n");
@@ -68,8 +68,8 @@ logisticVS <- function(X, Y, b, v, g=1, block=NULL,
     if(aG <= 2) stop("The parameter 'aG' for gupdate='hyperg' has to be larger than 2.\n")
   }
   
-  #if v is a vector, make a diagonal matrix out of it:
-  if(is.vector(v)) v <- diag(v);
+  #if v0 is a vector, make a diagonal matrix out of it:
+  if(is.vector(v0)) v0 <- diag(v0);
   
   #Center X[,j] (j=1,...,p) and Y (because we don't have an intercept in the model):
   Xs <- scale(X, scale=FALSE);
@@ -78,7 +78,7 @@ logisticVS <- function(X, Y, b, v, g=1, block=NULL,
   cat("Starting MCMC...\n");
   .C("logisticVS", 
       X = as.double(Xs), Y = as.double(Ys), n = as.integer(n), p = as.integer(p),
-      b = as.double(b), v = as.double(v), g = as.double(g),
+      b = as.double(b), v0 = as.double(v0), g = as.double(g),
       aBeta=as.double(aBeta), bBeta=as.double(bBeta),
       aG=as.double(aG), bG=as.double(bG),
       block = as.integer(block), MCMC = as.integer(MCMC), 

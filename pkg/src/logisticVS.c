@@ -47,7 +47,7 @@ void matrixInverse(double *V, int p){
 
 void LowerTri_fillZeros(double *V, int p){
 	//V is a matrix of dim pxp. This function keeps the lower triangular part 
-	//of the matrix but fills the upper triangular (below diagonal) with zeros.
+	//of the matrix but fills the upper triangular (above diagonal) with zeros.
 	
 	for (int i=1; i<p; i++) {
 		for (int j=0; j<i; j++) {
@@ -131,22 +131,24 @@ double dmvnorm(double *Z, int n, double *Zmean, double *Zprec, char Log, int pga
 	//(For internal notation, see dmvnorm() in R package mvtnorm.)
 	
 	const int one = 1;
-	const char Lower = 'L', Trans = 'T', NoDiag = 'N';
+	const char Upper = 'U', Lower = 'L', Trans = 'T', NoDiag = 'N';
 	
 	double Zcentered[n];
 	for (int j = 0; j < n; j++) {
 		Zcentered[j] = Z[j] - Zmean[j];
 	}
-	
-	//input Zprec, output Zchol (lower Cholesky factorisation matrix)
-	double Zchol[(n * n)];
+  
+  //input Zprec, output Zchol (lower Cholesky factorisation matrix)
+  double Zchol[(n * n)];
 	for (int i = 0; i < (n * n); i++) {
 		Zchol[i] = Zprec[i];
 	}
   
 	int info;
-	F77_NAME(dpotrf)(&Lower, &n, Zchol, &n, &info);
-	if(info != 0) error("Error in Lapack function dpotrf, while computing Zchol.\n");
+	F77_NAME(dpotrf)(&Upper, &n, Zchol, &n, &info);
+	if(info != 0){
+    error("Error in Lapack function dpotrf, while computing Zchol.\n");
+	}
 	
 	//input Zcentered, output Zchol %*% Zcentered
 	F77_NAME(dtrmv)(&Lower, &Trans, &NoDiag, &n, Zchol, &n, Zcentered, &one);
@@ -189,20 +191,13 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
     invvgam[i] = g * v0gam[i]; 
 	}
   matrixInverse(invvgam, pgam);
-	
-	double Vtmp[(pgam * pgam)];
 
 	if(pgam > n){
 		//inversion of nxn matrix: 
 		//Vtmp = vgam - vgam%*%t(Xgam)%*%solve(LAM + Xgam%*%vgam%*%t(Xgam))%*%Xgam%*%vgam;
-		
-    double vgam[(pgam * pgam)];
-    for (int i=0; i<(pgam * pgam); i++) {
-      vgam[i] = g * v0gam[i];
-    }
     
-		double Xvgam[(n * pgam)];
-		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &pgam, &oned, Xgam, &n, vgam, &pgam, &zerod, Xvgam, &n);
+		double Xvgam[(n * pgam)]; //Xgam %*% (g * v0gam)
+		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &pgam, &g, Xgam, &n, v0gam, &pgam, &zerod, Xvgam, &n);
  
 		double LAM_XvXgam[(n * n)]; //input = dLAM, output = LAMXvXgam
 		diagonalize(LAM, n, LAM_XvXgam);
@@ -217,12 +212,11 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		if(info != 0) error("Error in Lapack function dposv, while computing invLAMXvX. Error %d\n",info);
     
   	for (int i=0; i<(pgam * pgam); i++) {
-			Vtmp[i] = vgam[i]; //input = vgam, output = Vtmp
+			Vgam[i] = g * v0gam[i]; //input = vgam, output = Vtmp
 		}
-		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &moned, Xvgam, &n, invLAMXvX_Xvgam, &n, &oned, Vtmp, &pgam);
-		
+		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &moned, Xvgam, &n, invLAMXvX_Xvgam, &n, &oned, Vgam, &pgam);
+	
 	}else{
-
 		//inversion of dxd matrix (d=dim(GAM)):
 		//Vtmp = solve(t(Xgam)%*%invLAM%*%Xgam + solve(vgam));    
 		
@@ -231,15 +225,12 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 
 		// 1) input: invvgam, output: t(X)%*%invLAM%*%X + invvgam, 
     for (int i=0; i<(pgam * pgam); i++) {
-  	  Vtmp[i] = invvgam[i];
-	  }		
-		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &zerod, Vtmp, &pgam);		
+  	  Vgam[i] = invvgam[i];
+	  }		    
+		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &oned, Vgam, &pgam);		
     
     // 2) compute inverse (first cholesky decomposition, then inverse from that).
-		matrixInverse(Vtmp, pgam);
-	}
-  for (int i=0; i<(pgam * pgam); i++) {
-  	Vgam[i] = Vtmp[i];
+		matrixInverse(Vgam, pgam);
 	}
   
 	//Bgam = Vgam %*% (invvgam%*%bgam + tXgam%*%invLAM%*%Z);
@@ -254,11 +245,7 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 	F77_NAME(dgemv)(&Trans, &n, &pgam, &oned, Xgam, &n, invLAMZ, &one, &oned, invvbgam_XinvLAMZ, &one); 
 	// here invvbgam_XinvLAMZ is updated to include everything that is multiplied with Vgam resulting in Bgam
 	
-  double Btmp[pgam];
-	F77_NAME(dgemv)(&Trans, &pgam, &pgam, &oned, Vgam, &pgam, invvbgam_XinvLAMZ, &one, &zerod, Btmp, &one);	
-	for (int i=0; i<pgam; i++) {
-		Bgam[i] = Btmp[i];
-	}
+	F77_NAME(dgemv)(&Trans, &pgam, &pgam, &oned, Vgam, &pgam, invvbgam_XinvLAMZ, &one, &zerod, Bgam, &one);	
 }
 
 double Pgam_update(int pgam, int n, double *Xgam, double *bgam, 
@@ -289,7 +276,7 @@ double Pgam_update(int pgam, int n, double *Xgam, double *bgam,
 	double Zprecgam[(n * n)];
 	diagonalize(invLAM, n, Zprecgam);
 	F77_NAME(dgemm)(&NoTrans, &Trans, &n, &n, &pgam, &moned, invLAMXgamL, &n, invLAMXgamL, &n, &oned, Zprecgam, &n);
-	
+  
 	//Pgam = dmvnorm(Z, mean=as.vector(Xgam%*%bgam), sigma=chol2inv(chol(Zprecgam)), log=FALSE);
 	double Zmeangam[n];
 	F77_NAME(dgemv)(&NoTrans, &n, &pgam, &oned, Xgam, &n, bgam, &one, &zerod, Zmeangam, &one);
@@ -344,7 +331,7 @@ void betaGAM_update(int n, int p, double *X,
 	double Vgam[pgam * pgam];
 	double Bgam[pgam];
 	Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, v0gam, g, bgam, LAM, Z);
-	
+  
 	double Pgam = Pgam_update(pgam, n, Xgam, bgam, Z, invLAM, dinvLAM, Vgam, NoLog);
 	
 	//(1) Proposal for GAM
@@ -772,7 +759,6 @@ void logisticVS(double *X, double *Y, int *n, int *p,
   for (int i = 0; i < *p; i++){
     Pi[i] = (aBeta[i] / (aBeta[i] + bBeta[i]));
   }
-  //Rprintf("Starting Pi with prior mean, e.g. Pi[1] = %.3e\n", Pi[0]);
   
  	int GAM[*p];
 	double beta[*p];
