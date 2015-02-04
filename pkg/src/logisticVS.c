@@ -185,9 +185,9 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 	diagonalize(LAM, n, dLAM);
   
   double invvgam[(pgam * pgam)];
-    for (int i=0; i<(pgam * pgam); i++) {
-    	invvgam[i] = vgam[i]; 
-		}
+  for (int i=0; i<(pgam * pgam); i++) {
+    invvgam[i] = vgam[i]; 
+	}
   matrixInverse(invvgam, pgam); //input = vgam, output = invvgam
 	
 	double Vtmp[(pgam * pgam)];
@@ -490,7 +490,7 @@ void betaGAM_update(int n, int p, double *X,
 		matrixInverse(vprec, pstar);  //input vstar, output inverse(vstar)
 		
 		logpostbeta = dmvnorm(betastar, pstar, Bstar, Vprec, Log, pstar);
-		logpriorbeta = dmvnorm(betastar, pstar, bgam, vprec, Log, pstar);
+		logpriorbeta = dmvnorm(betastar, pstar, bstar, vprec, Log, pstar);
 	}
   
 	logprior[0] = logpriorGAM + logpriorbeta;
@@ -703,6 +703,12 @@ void LAMz_update(int n, int p, double *X, double *Y,
 		}
 		
 		double R = fabs(Z[j] - m[j]);
+    
+    //if(isinf(R)) {
+    //  Rprintf("%.4e %.4e %.4e %d", R[j], Z[j], m[j], pgam);
+    //  Rprintf("\n");
+    //}
+    
 		if(isinf(R) || isnan(R) || R>1e10){
 			error("Object R is (close to) infinite or NaN.\n");
 		}else{
@@ -710,8 +716,8 @@ void LAMz_update(int n, int p, double *X, double *Y,
 			logpriorLAM -= 0.5*log(16* LAM[j]) + log(KS_pdf(0.5*sqrt(LAM[j])));
 			logZ += dnorm(Z[j], m[j], sqrt(T * LAM[j]), 1);
 		}
-		
 	}
+  
 	logprob[0] = logZ + logpriorLAM;
 }
 
@@ -766,7 +772,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
   for (int i = 0; i < *p; i++){
     Pi[i] = (aBeta[i] / (aBeta[i] + bBeta[i]));
   }
-  Rprintf("Starting Pi with prior mean, e.g. Pi[1] = %.3e\n", Pi[0]);
+  //Rprintf("Starting Pi with prior mean, e.g. Pi[1] = %.3e\n", Pi[0]);
   
  	int GAM[*p];
 	double beta[*p];
@@ -775,9 +781,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		GAM[i] = (U < Pi[i] ? 1 : 0);
 		beta[i] = 0.0;
 	}
-   
-  double v[(*p * *p)];
-	
+  
 	double LAM[*n];
 	double Z[*n];
 	for (int j = 0; j < *n; j++) {
@@ -800,14 +804,14 @@ void logisticVS(double *X, double *Y, int *n, int *p,
     fidnumneigh = fopen("numneighs.txt", "w");
     fidselect = fopen("selects.txt", "w");
     fidg = fopen("g.txt", "w");
-    //fidpi = fopen("pi.txt", "w");
-	
+    //fidpi = fopen("pi.txt", "w"); 
+  
 	for (int K = 0; K < *MCMC; K++) {
-		
+    
 		// Allow R interrupts; check every 10 iterations
 		if (!(K % 10)) R_CheckUserInterrupt();
-  	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);
-			  
+  	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);    
+    
     if(*gupdate == 1){
       //class of inverse-gamma priors
       g_update_IG(g, *aG, *bG);
@@ -817,10 +821,11 @@ void logisticVS(double *X, double *Y, int *n, int *p,
       g_update_hyperg(g, *aG);
     }
       
+    double v[(*p * *p)];  
     for (int i = 0; i < (*p * *p); i++) {
 		  v[i] = *g * v0[i];
 	  } 
-      
+    
     if(*Piupdate == 1){
       Pi_update(Pi, GAM, aBeta, bBeta, *p);
     }
@@ -829,11 +834,11 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 					   b, v, Pi,
 					   beta, GAM, LAM, Z,
 					   block, T, numneigh, select, logpriorGAMbeta, logpostGAMbeta);
-		
+    
 		LAMz_update(*n, *p, X, Y,
 					beta, GAM, LAM, Z,
 					T, logLAMz);
-		
+    
 		if (!(K % *thin)) {
 			K2 = K / *thin;
 		      

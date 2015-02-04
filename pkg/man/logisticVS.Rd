@@ -15,7 +15,7 @@ logisticVS(X, Y, b, v, g = 1, block = NULL,
  \item{block}{A (sparse) p x p matrix with entries <> 0, if the corresponding two variables should be updated together (optional). The default is diag(1,p).}
  \item{aBeta}{Vector of prior parameters a[i] in Beta(a[i],b[i]) which is the prior distribution of Pi[i] (i = 1,...,p). The default is rep(1,p). Note, that together with the default for bBeta this implies a Uniform[0,1] prior distribution for all Pi[i], which might not be appropriate in very high-dimensional situations with p>>n. If Piupdate=FALSE this implies that a fixed Pi[i]=0.5 is assumed for i = 1,...,p.}
  \item{bBeta}{Vector of prior parameters b[i] in Beta(a[i],b[i]) which is the prior distribution of Pi[i] (i = 1,...,p). The default is rep(1,p).}
- \item{aG}{Hyper-prior parameter for g (for gupdate in \{"IG", "hyperg"\}). Shape parameter in IG(aG,bG).}
+ \item{aG}{Hyper-prior parameter for g (for gupdate in \{"IG", "hyperg"\}). Shape parameter in IG(aG,bG), or the only parameter in hyperg(aG) (then aG>2).}
  \item{bG}{Hyper-prior parameter for g (for gupdate = "IG" only). Scale parameter in IG(aG,bG).}
  \item{MCMC}{Number of MCMC samples.}
  \item{thinn}{Thinning parameter. Every 'thinn'-ed MCMC iteration will be kept.}

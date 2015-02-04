@@ -3,7 +3,7 @@
 #v0.2: Manuela Zucknick & Ana Corberan, 2014-05-05, last modified 2014-06-01
 #v0.24/v0.25: Manuel Wiesenfarth, 2014-11-27, added to R-forge 2015-01-14
 #v0.3: Manuela Zucknick, 2015-01-26 (add prior distributions for g)
-#v0.31: Manuela Zucknick, 2015-01-28 (add non-diagonal v)
+#v0.31/v0.32: Manuela Zucknick, 2015-01-28 (add non-diagonal v), debugging 2015-02-04
 
 logisticVS <- function(X, Y, b, v, g=1, block=NULL, 
                        aBeta=NULL, bBeta=NULL,
@@ -47,18 +47,27 @@ logisticVS <- function(X, Y, b, v, g=1, block=NULL,
   if(is.null(aBeta)) aBeta <- rep(1, p);
   if(is.null(bBeta)) bBeta <- rep(1, p);
   
-  #Default: Zellner-Siow prior (Zellner & Siow 1980)
-  if(is.null(aG)) aG <- 0.5;
-  if(is.null(bG)) bG <- 0.5;
-  
   if(is.na(Piupdate)) stop("'Pipudate' should be either FALSE or TRUE (no missing values allowed).\n") 
   Piupdate <- ifelse(Piupdate==TRUE, 1, 0);
   
   if(gupdate!="none" & gupdate!="IG" & gupdate!="hyperg") stop("'gupdate' should be either 'none', 'IG', or 'hyperg'.\n")
   gupdate.int <- 0;
-  if(gupdate == "IG") gupdate.int <- 1;
-  if(gupdate == "hyperg") gupdate.int <- 2;
-
+  
+  if(gupdate == "IG"){
+    gupdate.int <- 1;
+    
+    #default: Zellner-Siow prior (Zellner & Siow 1980)
+    if(is.null(aG)) aG <- 0.5;
+    if(is.null(bG)) bG <- 0.5;
+    if(aG <=0 | bG <= 0) stop("The parameters 'aG' and 'bG' for gupdate='IG' have to be positive.\n")
+  }
+  if(gupdate == "hyperg"){
+    gupdate.int <- 2;
+    
+    if(is.null(aG)) aG <- 3; #default: prior suggested by Liang et al. (2008)
+    if(aG <= 2) stop("The parameter 'aG' for gupdate='hyperg' has to be larger than 2.\n")
+  }
+  
   #if v is a vector, make a diagonal matrix out of it:
   if(is.vector(v)) v <- diag(v);
   
