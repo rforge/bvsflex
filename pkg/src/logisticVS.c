@@ -143,7 +143,7 @@ double dmvnorm(double *Z, int n, double *Zmean, double *Zprec, char Log, int pga
 	for (int i = 0; i < (n * n); i++) {
 		Zchol[i] = Zprec[i];
 	}
-	
+  
 	int info;
 	F77_NAME(dpotrf)(&Lower, &n, Zchol, &n, &info);
 	if(info != 0) error("Error in Lapack function dpotrf, while computing Zchol.\n");
@@ -168,7 +168,7 @@ double dmvnorm(double *Z, int n, double *Zmean, double *Zprec, char Log, int pga
 }
 
 void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
-					  double *Xgam, double *vgam, double *bgam, double *LAM, double *Z){
+					  double *Xgam, double *v0gam, double g, double *bgam, double *LAM, double *Z){
 	
 	const int one = 1;
 	const double oned = 1.0, zerod = 0.0, moned = -1.0;
@@ -186,9 +186,9 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
   
   double invvgam[(pgam * pgam)];
   for (int i=0; i<(pgam * pgam); i++) {
-    invvgam[i] = vgam[i]; 
+    invvgam[i] = g * v0gam[i]; 
 	}
-  matrixInverse(invvgam, pgam); //input = vgam, output = invvgam
+  matrixInverse(invvgam, pgam);
 	
 	double Vtmp[(pgam * pgam)];
 
@@ -196,6 +196,11 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		//inversion of nxn matrix: 
 		//Vtmp = vgam - vgam%*%t(Xgam)%*%solve(LAM + Xgam%*%vgam%*%t(Xgam))%*%Xgam%*%vgam;
 		
+    double vgam[(pgam * pgam)];
+    for (int i=0; i<(pgam * pgam); i++) {
+      vgam[i] = g * v0gam[i];
+    }
+    
 		double Xvgam[(n * pgam)];
 		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &pgam, &oned, Xgam, &n, vgam, &pgam, &zerod, Xvgam, &n);
  
@@ -224,17 +229,17 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		double sqrtinvLAMXgam[(n * pgam)];
 		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &n, &oned, dsqrtinvLAM, &n, Xgam, &n, &zerod, sqrtinvLAMXgam, &n);
 
-		// 1) compute t(X)%*%invLAM%*%X, 2) add invvgam, 
-		// 3) compute inverse (first cholesky decomposition, then inverse from that).
+		// 1) input: invvgam, output: t(X)%*%invLAM%*%X + invvgam, 
+    for (int i=0; i<(pgam * pgam); i++) {
+  	  Vtmp[i] = invvgam[i];
+	  }		
 		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &zerod, Vtmp, &pgam);		
     
-		for (int i=0; i<(pgam * pgam); i++) {
-			Vtmp[i] += invvgam[i];
-		}
+    // 2) compute inverse (first cholesky decomposition, then inverse from that).
 		matrixInverse(Vtmp, pgam);
 	}
-	for (int i=0; i<(pgam * pgam); i++) {
-		Vgam[i] = Vtmp[i];
+  for (int i=0; i<(pgam * pgam); i++) {
+  	Vgam[i] = Vtmp[i];
 	}
   
 	//Bgam = Vgam %*% (invvgam%*%bgam + tXgam%*%invLAM%*%Z);
@@ -268,7 +273,7 @@ double Pgam_update(int pgam, int n, double *Xgam, double *bgam,
 	for (int i=0; i<(pgam * pgam); i++) {
 		Lgam[i] = Vgam[i]; //input Vgam, output Lgam (lower Cholesky factorisation matrix)
 	}
-	
+  
 	int info;
 	F77_NAME(dpotrf)(&Lower, &pgam, Lgam, &pgam, &info);
 	if(info != 0) error("Error in Lapack function dpotrf, while computing Lgam. info = %d\n", info);
@@ -288,13 +293,13 @@ double Pgam_update(int pgam, int n, double *Xgam, double *bgam,
 	//Pgam = dmvnorm(Z, mean=as.vector(Xgam%*%bgam), sigma=chol2inv(chol(Zprecgam)), log=FALSE);
 	double Zmeangam[n];
 	F77_NAME(dgemv)(&NoTrans, &n, &pgam, &oned, Xgam, &n, bgam, &one, &zerod, Zmeangam, &one);
-	
+  
 	double Pgam = dmvnorm(Z, n, Zmeangam, Zprecgam, NoLog, pgam);
 	return(Pgam);
 }
 
 void betaGAM_update(int n, int p, double *X, 
-					double *b, double *v, double *Pi,
+					double *b, double *v0, double g, double *Pi,
 					double *beta, int *GAM, double *LAM, double *Z,  
 					int *block, double T, int *numneigh, int *select,
 					double *logprior, double *logpost)
@@ -329,16 +334,16 @@ void betaGAM_update(int n, int p, double *X,
 	double Xgam[(pgam * n)];
 	matrixSubset(X, GAM, n, p, Xgam);
   
-  double vtmpgam[(p * pgam)], vgam[(pgam * pgam)];
-  matrixSubset(v, GAM, p, p, vtmpgam); //matrixSubset subsets wrt. columns
-  matrixSubsetRows(vtmpgam, GAM, p, pgam, vgam); //matrixSubsetRows subsets wrt. rows
-	
+  double v0tmpgam[(p * pgam)], v0gam[(pgam * pgam)];
+  matrixSubset(v0, GAM, p, p, v0tmpgam); //matrixSubset subsets wrt. columns
+  matrixSubsetRows(v0tmpgam, GAM, p, pgam, v0gam); //matrixSubsetRows subsets wrt. rows
+  
 	double bgam[pgam];
 	vectorSubset(b, GAM, p, bgam);
 	
 	double Vgam[pgam * pgam];
 	double Bgam[pgam];
-	Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, vgam, bgam, LAM, Z);
+	Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, v0gam, g, bgam, LAM, Z);
 	
 	double Pgam = Pgam_update(pgam, n, Xgam, bgam, Z, invLAM, dinvLAM, Vgam, NoLog);
 	
@@ -385,16 +390,16 @@ void betaGAM_update(int n, int p, double *X,
 			double Xtry[(ptry * n)];
 			matrixSubset(X, GAMtry, n, p, Xtry);
 			
-      double vtmptry[(p * ptry)], vtry[(ptry * ptry)];
-      matrixSubset(v, GAMtry, p, p, vtmptry); //matrixSubset subsets wrt. columns
-      matrixSubsetRows(vtmptry, GAMtry, p, ptry, vtry); //matrixSubsetRows subsets wrt. rows
+      double v0tmptry[(p * ptry)], v0try[(ptry * ptry)];
+      matrixSubset(v0, GAMtry, p, p, v0tmptry); //matrixSubset subsets wrt. columns
+      matrixSubsetRows(v0tmptry, GAMtry, p, ptry, v0try); //matrixSubsetRows subsets wrt. rows
       
 			double btry[ptry];
 			vectorSubset(b, GAMtry, p, btry);
 			
 			double Vtry[(ptry * ptry)];
 			double Btry[ptry];
-			Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, vtry, btry, LAM, Z);
+			Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, v0try, g, btry, LAM, Z);
 			
 			double Ptry = Pgam_update(ptry, n, Xtry, btry, Z, invLAM, dinvLAM, Vtry, NoLog);
       
@@ -426,16 +431,16 @@ void betaGAM_update(int n, int p, double *X,
 	double Xstar[(pstar * n)];
 	matrixSubset(X, GAMstar, n, p, Xstar);
 
-	double vtmpstar[(p * pstar)], vstar[(pstar * pstar)];
-	matrixSubset(v, GAMstar, p, p, vtmpstar); //matrixSubset subsets wrt. columns
-  matrixSubsetRows(vtmpstar, GAMstar, p, pstar, vstar); //matrixSubsetRows subsets wrt. rows
+	double v0tmpstar[(p * pstar)], v0star[(pstar * pstar)];
+	matrixSubset(v0, GAMstar, p, p, v0tmpstar); //matrixSubset subsets wrt. columns
+  matrixSubsetRows(v0tmpstar, GAMstar, p, pstar, v0star); //matrixSubsetRows subsets wrt. rows
 	
 	double bstar[pstar];
 	vectorSubset(b, GAMstar, p, bstar);
 	
 	double Vstar[(pstar * pstar)];
 	double Bstar[pstar];
-	Vgam_Bgam_update(Vstar, Bstar, pstar, n, Xstar, vstar, bstar, LAM, Z);
+	Vgam_Bgam_update(Vstar, Bstar, pstar, n, Xstar, v0star, g, bstar, LAM, Z);
 	
 	double logPgam = Pgam_update(pstar, n, Xstar, bstar, Z, invLAM, dinvLAM, Vstar, Log);
 	
@@ -485,9 +490,9 @@ void betaGAM_update(int n, int p, double *X,
 		matrixInverse(Vprec, pstar);  //input Vstar, output inverse(Vstar)
     
     for (int i = 0; i < (pstar * pstar); i++) {
-  		vprec[i] = vstar[i];
+  		vprec[i] = g * v0star[i];
 		}
-		matrixInverse(vprec, pstar);  //input vstar, output inverse(vstar)
+		matrixInverse(vprec, pstar);  //input vstar = g * v0star, output inverse(vstar)
 		
 		logpostbeta = dmvnorm(betastar, pstar, Bstar, Vprec, Log, pstar);
 		logpriorbeta = dmvnorm(betastar, pstar, bstar, vprec, Log, pstar);
@@ -704,11 +709,6 @@ void LAMz_update(int n, int p, double *X, double *Y,
 		
 		double R = fabs(Z[j] - m[j]);
     
-    //if(isinf(R)) {
-    //  Rprintf("%.4e %.4e %.4e %d", R[j], Z[j], m[j], pgam);
-    //  Rprintf("\n");
-    //}
-    
 		if(isinf(R) || isnan(R) || R>1e10){
 			error("Object R is (close to) infinite or NaN.\n");
 		}else{
@@ -820,18 +820,13 @@ void logisticVS(double *X, double *Y, int *n, int *p,
       //class of inverse-gamma priors
       g_update_hyperg(g, *aG);
     }
-      
-    double v[(*p * *p)];  
-    for (int i = 0; i < (*p * *p); i++) {
-		  v[i] = *g * v0[i];
-	  } 
     
     if(*Piupdate == 1){
       Pi_update(Pi, GAM, aBeta, bBeta, *p);
     }
   
 		betaGAM_update(*n, *p, X,
-					   b, v, Pi,
+					   b, v0, *g, Pi,
 					   beta, GAM, LAM, Z,
 					   block, T, numneigh, select, logpriorGAMbeta, logpostGAMbeta);
     
