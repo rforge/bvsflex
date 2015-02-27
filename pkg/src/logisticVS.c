@@ -195,22 +195,24 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		// 1) compute t(Xgam)%*%invLAM%*%Xgam + hgam, 
     // in case of the "WLS g-prior" this is equal to (g+1)/g %*% t(Xgam)%*%invLAM%*%Xgam
     
-    //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
+    //if h0 is a scalar and equal to 0 this indicates a "WLS g-prior"
     double hgam[(pgam * pgam)];
-    if(sizeof(h0gam)/sizeof(h0gam[0]) != 0){
-      for (int i=0; i<(pgam * pgam); i++) {
-        hgam[i] = (1.0/g) * h0gam[i]; 
-        Vgam[i] = hgam[i];
-      }   
-		  F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &oned, Vgam, &pgam);		
-    }else{	 
+    if(sizeof(h0gam)/sizeof(h0gam[0]) == 1 & h0gam[0] == 0){
       double scalar = (g+1.0)/g;
-		  F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &scalar, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &zerod, Vgam, &pgam);	
+  	  F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &scalar, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &zerod, Vgam, &pgam);	
       
       for (int i=0; i<(pgam * pgam); i++) {
         hgam[i] = 1.0/(g+1.0) * Vgam[i]; //because here Vgam is still actually solve(Vgam)=Hgam
       }	
-    }
+    }else{
+      for (int i=0; i<(pgam * pgam); i++) {
+        hgam[i] = (1.0/g) * h0gam[i]; 
+        Vgam[i] = hgam[i];
+      }   
+      
+      //input: hgam, output: t(Xgam)%*%invLAM%*%Xgam + hgam
+  	  F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &oned, Vgam, &pgam);		
+    }  
     
     // 2) compute inverse
 		matrixInverse(Vgam, pgam);
@@ -227,7 +229,7 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 	F77_NAME(dgemv)(&Trans, &n, &pgam, &oned, Xgam, &n, invLAMZ, &one, &oned, hbgam_XinvLAMZ, &one); 
 	// here hbgam_XinvLAMZ is updated to include everything that is multiplied with Vgam resulting in Bgam
 	
-	F77_NAME(dgemv)(&Trans, &pgam, &pgam, &oned, Vgam, &pgam, hbgam_XinvLAMZ, &one, &zerod, Bgam, &one);	
+	F77_NAME(dgemv)(&NoTrans, &pgam, &pgam, &oned, Vgam, &pgam, hbgam_XinvLAMZ, &one, &zerod, Bgam, &one);	
 }
 
 double Pgam_update(int pgam, int n, double *Xgam, double *bgam, 
@@ -309,15 +311,15 @@ void betaGAM_update(int n, int p, double *X,
 	double Vgam[pgam * pgam];
 	double Bgam[pgam];
   
-  //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
-  if(sizeof(h0)/sizeof(h0[0]) != 0){
+  //if h0 is a scalar and equal to 0 this indicates a "WLS g-prior"
+  if(sizeof(h0)/sizeof(h0[0]) == 1 & h0[0] == 0){
+    Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, h0, g, bgam, LAM, Z);
+  }else{
     double h0tmpgam[(p * pgam)], h0gam[(pgam * pgam)];
     matrixSubset(h0, GAM, p, p, h0tmpgam); //matrixSubset subsets wrt. columns
     matrixSubsetRows(h0tmpgam, GAM, p, pgam, h0gam); //matrixSubsetRows subsets wrt. rows
   
     Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, h0gam, g, bgam, LAM, Z);
-  }else{
-    Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, h0, g, bgam, LAM, Z);
   }
   
 	double Pgam = Pgam_update(pgam, n, Xgam, bgam, Z, invLAM, dinvLAM, Vgam, NoLog);
@@ -371,15 +373,15 @@ void betaGAM_update(int n, int p, double *X,
 			double Vtry[(ptry * ptry)];
 			double Btry[ptry];
       
-      //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
-      if(sizeof(h0)/sizeof(h0[0]) != 0){
+      //if h0 is a scalar and equal to 0 this indicates a "WLS g-prior"
+      if(sizeof(h0)/sizeof(h0[0]) == 1 & h0[0] == 0){
+        Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, h0, g, btry, LAM, Z); 
+       }else{
         double h0tmptry[(p * ptry)], h0try[(ptry * ptry)];
         matrixSubset(h0, GAMtry, p, p, h0tmptry); //matrixSubset subsets wrt. columns
         matrixSubsetRows(h0tmptry, GAMtry, p, ptry, h0try); //matrixSubsetRows subsets wrt. rows
 
         Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, h0try, g, btry, LAM, Z);
-      }else{
-        Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, h0, g, btry, LAM, Z); 
       }
 			
 			double Ptry = Pgam_update(ptry, n, Xtry, btry, Z, invLAM, dinvLAM, Vtry, NoLog);
@@ -418,18 +420,18 @@ void betaGAM_update(int n, int p, double *X,
 	double Vstar[(pstar * pstar)];
 	double Bstar[pstar];
 
-  //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
+  //if h0 is a scalar and equal to 0 this indicates a "WLS g-prior"
   double h0star[(pstar * pstar)];
-  if(sizeof(h0)/sizeof(h0[0]) != 0){
-	  double h0tmpstar[(p * pstar)];
-	  matrixSubset(h0, GAMstar, p, p, h0tmpstar); //matrixSubset subsets wrt. columns
+  if(sizeof(h0)/sizeof(h0[0]) == 1 & h0[0] == 0){
+    Vgam_Bgam_update(Vstar, Bstar, pstar, n, Xstar, h0, g, bstar, LAM, Z); 
+  }else{
+    double h0tmpstar[(p * pstar)];
+    matrixSubset(h0, GAMstar, p, p, h0tmpstar); //matrixSubset subsets wrt. columns
     matrixSubsetRows(h0tmpstar, GAMstar, p, pstar, h0star); //matrixSubsetRows subsets wrt. rows
   
     Vgam_Bgam_update(Vstar, Bstar, pstar, n, Xstar, h0star, g, bstar, LAM, Z);
-  }else{
-    Vgam_Bgam_update(Vstar, Bstar, pstar, n, Xstar, h0, g, bstar, LAM, Z); 
   }
-	
+  
 	double logPgam = Pgam_update(pstar, n, Xstar, bstar, Z, invLAM, dinvLAM, Vstar, Log);
 	
 	double Lstar[(pstar * pstar)];
@@ -477,14 +479,14 @@ void betaGAM_update(int n, int p, double *X,
 		}
 		matrixInverse(Hstar, pstar);  //input Vstar, output Hstar=inverse(Vstar)
     
-    //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
-    if(sizeof(h0)/sizeof(h0[0]) != 0){
-      for (int i = 0; i < (pstar * pstar); i++) {
-  		  hstar[i] = (1.0/g) * h0star[i];
-		  }
-    }else{
+    //if h0 is a scalar and equal to 0 this indicates a "WLS g-prior"
+    if(sizeof(h0)/sizeof(h0[0]) == 1 & h0[0] == 0){
       for (int i = 0; i < (pstar * pstar); i++) {
         hstar[i] = (1.0/(g+1.0)) * Hstar[i];
+  	  }
+    }else{
+      for (int i = 0; i < (pstar * pstar); i++) {
+    	  hstar[i] = (1.0/g) * h0star[i];
 		  }
     }
 		

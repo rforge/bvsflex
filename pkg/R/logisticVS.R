@@ -49,7 +49,7 @@ logisticVS <- function(X, Y, b, h0, g=1, block=NULL,
     #if h0 is a vector, make a diagonal matrix out of it:
     if(is.vector(h0)) h0 <- diag(h0);
   }else{
-    h0 <- 1.0; #if h0 is a scalar, in C code this is interpreted as wlsgprior==TRUE
+    h0 <- 0.0; #if h0 is a scalar and equal to 0.0, in C code this is interpreted as wlsgprior==TRUE
   }
   if(length(g) != 1) stop("g should be a scalar.\n");
   if(ncol(block) != p | nrow(block) != p) stop("Dimension of 'block' has to be p x p, where p = ncol(X).\n");
