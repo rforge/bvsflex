@@ -4,7 +4,8 @@
 \usage{
 logisticVS(X, Y, b, h0, g = 1, block = NULL, 
     aBeta = NULL, bBeta = NULL, aG = NULL, bG = NULL,
-    MCMC, thinn = 1, seed = 1234, outdir = NULL, Piupdate = FALSE, gupdate = "none")
+    MCMC, thinn = 1, seed = 1234, outdir = NULL, 
+    Piupdate = FALSE, gupdate = "none", wlsgprior=FALSE)
 }
 \arguments{
  \item{X}{The input matrix with n rows (no. samples) and p columns (no. variables).}
@@ -23,6 +24,7 @@ logisticVS(X, Y, b, h0, g = 1, block = NULL,
  \item{outdir}{A character string specifying the directory for saving MCMC output files.}
  \item{Piupdate}{Should Pi be sampled according to a prior Beta distribution? The default is FALSE, which implies that Pi is assumed to be fixed as aBeta/(aBeta+bBeta).}
  \item{gupdate}{Class of prior distributions for the hyper-parameter g. Possible values are "IG" (inverse-gamma distribution), "hyperg" (hyper-g prior, see Liang et al. 2008), and "none". The default is "none", which implies that g is assumed to be fixed with the value specified.}
+ \item{wlsgprior}{Should the 'weighted least squares g-prior' be used? If TRUE, then h[gamma] is computed as 1/g * t(x[gamma]) \%*\% solve(Lambda) \%*\% x[gamma] in each iteration, instead of using h = 1/g * h0 (i.e. h0 is not used in this case).}
 }
 \description{
 The BVSflex package implements efficient Bayesian variable selection models for high-dimensional input data. A flexible selection prior allows the incorporation of additional information, e.g. a second data source including all sources of variation. 
@@ -46,7 +48,7 @@ Zucknick M, Richardson S (2014). ``MCMC algorithms for Bayesian variable selecti
 \examples{
 # Low-dimensional example (this will take several seconds):
 set.seed(1234)
-B <- 2000
+B <- 1000
 n <- 100
 p <- 18
 d <- 3
@@ -58,7 +60,7 @@ res <- logisticVS(X, Y, b=rep(0,p), h0=t(X)\%*\%X,
        aBeta=rep(1,p), bBeta=rep(5,p), aG=0.5, bG=0.5*2.5^2,
        MCMC=B, thinn=1, seed=1234, 
        outdir=paste(getwd(), "example", sep="/"), 
-       Piupdate=TRUE, gupdate="IG")
+       Piupdate=TRUE, gupdate="IG", wlsgprior=FALSE)
 
 \dontrun{
 require(Matrix)

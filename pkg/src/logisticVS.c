@@ -185,63 +185,35 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 	
 	double dLAM[(n * n)];
 	diagonalize(LAM, n, dLAM);
-  
-  double hgam[(pgam * pgam)];
-  for (int i=0; i<(pgam * pgam); i++) {
-    hgam[i] = (1/g) * h0gam[i]; 
-	}
-  matrixInverse(hgam, pgam);
 
-  /*
-  //Problem in new version of code: inverse(hgam) does not exist if pgam>n (hgam is not of full rank)
-  //Therefore, the computation previously used for pgam>n, does not work anymore.
-	if(pgam > n){
-		//inversion of nxn matrix: 
-		//Vgam = vgam - vgam%*%t(Xgam)%*%solve(LAM + Xgam%*%vgam%*%t(Xgam))%*%Xgam%*%vgam;
-    
-    double vgam[(pgam * pgam)];
-    for (int i=0; i<(pgam * pgam); i++) {
-      vgam[i] = hgam[i]; 
-    }
-    matrixInverse(vgam, pgam); //vgam = inverse(hgam)
-    
-		double Xvgam[(n * pgam)]; //Xgam %*% vgam
-		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &pgam, &oned, Xgam, &n, vgam, &pgam, &zerod, Xvgam, &n);
- 
-		double LAM_XvXgam[(n * n)]; //input = dLAM, output = LAMXvXgam
-		diagonalize(LAM, n, LAM_XvXgam);
-		F77_NAME(dgemm)(&NoTrans, &Trans, &n, &n, &pgam, &oned, Xgam, &n, Xvgam, &n, &oned, LAM_XvXgam, &n);
-		
-		int info;
-		double invLAMXvX_Xvgam[(n * pgam)]; //input = Xvgam, output = invLAMXvX_Xvgam
-		for (int i=0; i<(n * pgam); i++) {
-			invLAMXvX_Xvgam[i] = Xvgam[i];
-		}
-		F77_NAME(dposv)(&Upper, &n, &pgam, LAM_XvXgam, &n, invLAMXvX_Xvgam, &n, &info);
-		if(info != 0) error("Error in Lapack function dposv, while computing invLAMXvX. Error %d\n",info);
-    
-  	for (int i=0; i<(pgam * pgam); i++) {
-			Vgam[i] = vgam[i]; //input = vgam, output = Vgam
-		}
-		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &moned, Xvgam, &n, invLAMXvX_Xvgam, &n, &oned, Vgam, &pgam);
-	
-	}else{
-  */
 		//inversion of dxd matrix (d=dim(GAM)):
 		//Vgam = solve(t(Xgam)%*%invLAM%*%Xgam + hgam);    
 		
 		double sqrtinvLAMXgam[(n * pgam)];
 		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &n, &oned, dsqrtinvLAM, &n, Xgam, &n, &zerod, sqrtinvLAMXgam, &n);
 
-		// 1) input: hgam=inverse(vgam), output: t(Xgam)%*%invLAM%*%Xgam + hgam, 
-    for (int i=0; i<(pgam * pgam); i++) {
-  	  Vgam[i] = hgam[i];
-	  }		    
-		F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &oned, Vgam, &pgam);		
+		// 1) compute t(Xgam)%*%invLAM%*%Xgam + hgam, 
+    // in case of the "WLS g-prior" this is equal to (g+1)/g %*% t(Xgam)%*%invLAM%*%Xgam
+    
+    //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
+    double hgam[(pgam * pgam)];
+    if(sizeof(h0gam)/sizeof(h0gam[0]) != 0){
+      for (int i=0; i<(pgam * pgam); i++) {
+        hgam[i] = (1.0/g) * h0gam[i]; 
+        Vgam[i] = hgam[i];
+      }   
+		  F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &oned, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &oned, Vgam, &pgam);		
+    }else{	 
+      double scalar = (g+1.0)/g;
+		  F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &scalar, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &zerod, Vgam, &pgam);	
+      
+      for (int i=0; i<(pgam * pgam); i++) {
+        hgam[i] = 1.0/(g+1.0) * Vgam[i]; //because here Vgam is still actually solve(Vgam)=Hgam
+      }	
+    }
     
     // 2) compute inverse
 		matrixInverse(Vgam, pgam);
-	//}
   
 	//Bgam = Vgam %*% (hgam%*%bgam + tXgam%*%invLAM%*%Z);
 	double hbgam_XinvLAMZ[pgam];
@@ -331,16 +303,22 @@ void betaGAM_update(int n, int p, double *X,
 	double Xgam[(pgam * n)];
 	matrixSubset(X, GAM, n, p, Xgam);
   
-  double h0tmpgam[(p * pgam)], h0gam[(pgam * pgam)];
-  matrixSubset(h0, GAM, p, p, h0tmpgam); //matrixSubset subsets wrt. columns
-  matrixSubsetRows(h0tmpgam, GAM, p, pgam, h0gam); //matrixSubsetRows subsets wrt. rows
-  
-	double bgam[pgam];
-	vectorSubset(b, GAM, p, bgam);
+  double bgam[pgam];
+  vectorSubset(b, GAM, p, bgam);
 	
 	double Vgam[pgam * pgam];
 	double Bgam[pgam];
-	Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, h0gam, g, bgam, LAM, Z);
+  
+  //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
+  if(sizeof(h0)/sizeof(h0[0]) != 0){
+    double h0tmpgam[(p * pgam)], h0gam[(pgam * pgam)];
+    matrixSubset(h0, GAM, p, p, h0tmpgam); //matrixSubset subsets wrt. columns
+    matrixSubsetRows(h0tmpgam, GAM, p, pgam, h0gam); //matrixSubsetRows subsets wrt. rows
+  
+    Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, h0gam, g, bgam, LAM, Z);
+  }else{
+    Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, h0, g, bgam, LAM, Z);
+  }
   
 	double Pgam = Pgam_update(pgam, n, Xgam, bgam, Z, invLAM, dinvLAM, Vgam, NoLog);
 	
@@ -387,16 +365,22 @@ void betaGAM_update(int n, int p, double *X,
 			double Xtry[(ptry * n)];
 			matrixSubset(X, GAMtry, n, p, Xtry);
 			
-      double h0tmptry[(p * ptry)], h0try[(ptry * ptry)];
-      matrixSubset(h0, GAMtry, p, p, h0tmptry); //matrixSubset subsets wrt. columns
-      matrixSubsetRows(h0tmptry, GAMtry, p, ptry, h0try); //matrixSubsetRows subsets wrt. rows
-      
-			double btry[ptry];
-			vectorSubset(b, GAMtry, p, btry);
+      double btry[ptry];
+  		vectorSubset(b, GAMtry, p, btry);
 			
 			double Vtry[(ptry * ptry)];
 			double Btry[ptry];
-			Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, h0try, g, btry, LAM, Z);
+      
+      //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
+      if(sizeof(h0)/sizeof(h0[0]) != 0){
+        double h0tmptry[(p * ptry)], h0try[(ptry * ptry)];
+        matrixSubset(h0, GAMtry, p, p, h0tmptry); //matrixSubset subsets wrt. columns
+        matrixSubsetRows(h0tmptry, GAMtry, p, ptry, h0try); //matrixSubsetRows subsets wrt. rows
+
+        Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, h0try, g, btry, LAM, Z);
+      }else{
+        Vgam_Bgam_update(Vtry, Btry, ptry, n, Xtry, h0, g, btry, LAM, Z); 
+      }
 			
 			double Ptry = Pgam_update(ptry, n, Xtry, btry, Z, invLAM, dinvLAM, Vtry, NoLog);
       
@@ -428,16 +412,23 @@ void betaGAM_update(int n, int p, double *X,
 	double Xstar[(pstar * n)];
 	matrixSubset(X, GAMstar, n, p, Xstar);
 
-	double h0tmpstar[(p * pstar)], h0star[(pstar * pstar)];
-	matrixSubset(h0, GAMstar, p, p, h0tmpstar); //matrixSubset subsets wrt. columns
-  matrixSubsetRows(h0tmpstar, GAMstar, p, pstar, h0star); //matrixSubsetRows subsets wrt. rows
-	
-	double bstar[pstar];
-	vectorSubset(b, GAMstar, p, bstar);
+  double bstar[pstar];
+  vectorSubset(b, GAMstar, p, bstar);
 	
 	double Vstar[(pstar * pstar)];
 	double Bstar[pstar];
-	Vgam_Bgam_update(Vstar, Bstar, pstar, n, Xstar, h0star, g, bstar, LAM, Z);
+
+  //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
+  double h0star[(pstar * pstar)];
+  if(sizeof(h0)/sizeof(h0[0]) != 0){
+	  double h0tmpstar[(p * pstar)];
+	  matrixSubset(h0, GAMstar, p, p, h0tmpstar); //matrixSubset subsets wrt. columns
+    matrixSubsetRows(h0tmpstar, GAMstar, p, pstar, h0star); //matrixSubsetRows subsets wrt. rows
+  
+    Vgam_Bgam_update(Vstar, Bstar, pstar, n, Xstar, h0star, g, bstar, LAM, Z);
+  }else{
+    Vgam_Bgam_update(Vstar, Bstar, pstar, n, Xstar, h0, g, bstar, LAM, Z); 
+  }
 	
 	double logPgam = Pgam_update(pstar, n, Xstar, bstar, Z, invLAM, dinvLAM, Vstar, Log);
 	
@@ -486,9 +477,16 @@ void betaGAM_update(int n, int p, double *X,
 		}
 		matrixInverse(Hstar, pstar);  //input Vstar, output Hstar=inverse(Vstar)
     
-    for (int i = 0; i < (pstar * pstar); i++) {
-  		hstar[i] = (1.0/g) * h0star[i];
-		}
+    //if h0 is any matrix (rather than scalar which would indicate "WLS g-prior")
+    if(sizeof(h0)/sizeof(h0[0]) != 0){
+      for (int i = 0; i < (pstar * pstar); i++) {
+  		  hstar[i] = (1.0/g) * h0star[i];
+		  }
+    }else{
+      for (int i = 0; i < (pstar * pstar); i++) {
+        hstar[i] = (1.0/(g+1.0)) * Hstar[i];
+		  }
+    }
 		
 		logpostbeta = dmvnorm(betastar, pstar, Bstar, Hstar, Log, pstar);
 		logpriorbeta = dmvnorm(betastar, pstar, bstar, hstar, Log, pstar);
@@ -746,6 +744,8 @@ void g_update_hyperg(double *g, double aG){
 //New version (with aBeta and bBeta and allowing for hyper-prior for g)
 //Now with prior precision h0 instead of prior variance v0. 
 //g keeps its meaning, therefore, the full prior precision matrix is h = (1/g) * h0.
+//if h0 is a scalar (array of length 1), this indicates the use of the "weighted least-squares g-prior" 
+//instead of a prespecified precision matrix h0.
 void logisticVS(double *X, double *Y, int *n, int *p,
   			double *b, double *h0, double *g, 
         double *aBeta, double *bBeta,
