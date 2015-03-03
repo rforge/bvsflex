@@ -56,7 +56,7 @@ X <- matrix(rnorm(n*p), ncol=p)
 beta <- c(rep(1,d),rep(0,p-d))
 expeta <- exp(X\%*\%beta)
 Y <- rbinom(n, 1, prob=expeta/(expeta + 1))
-res <- logisticVS(X, Y, b=rep(0,p), h0=t(X)\%*\%X,
+res <- logisticVS(X, Y, b=rep(0,p), h0=1/n * t(X)\%*\%X,
        aBeta=rep(1,p), bBeta=rep(5,p), aG=0.5, bG=0.5*2.5^2,
        MCMC=B, thinn=1, seed=1234, 
        outdir=paste(getwd(), "example", sep="/"), 
@@ -80,7 +80,7 @@ X <- matrix(rnorm(n*p), ncol=p)
 beta <- c(rep(2,d),rep(0,p-d))
 expeta <- exp(X\%*\%beta)
 Y <- rbinom(n, 1, prob=expeta/(expeta + 1))
-res <- logisticVS(X, Y, b=rep(0,p), h0=rep(1,p), g=1, block=diag(1,p), 
+res <- logisticVS(X, Y, b=rep(0,p), h0=rep(1,p), g=1, block=diag(1/n,p), 
        aBeta=rep(1,p), bBeta=rep((p-d)/d,p),
        MCMC=B, thinn=1, seed=1234, 
        outdir=paste(getwd(), "example", sep="/"), 

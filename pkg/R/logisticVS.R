@@ -39,6 +39,7 @@ logisticVS <- function(X, Y, b, h0, g=1, block=NULL,
     stop("'wlsgprior' is a binary, only values TRUE and FALSE are allowed.\n");
   }
   if(wlsgprior == FALSE){
+    if(is.null(h0)) stop("Please provide h0.\n");
     if(is.vector(h0)){
       if(length(h0) != p) stop("If h0 is a vector, length of h0 has to be p = ncol(X).\n");
     }else{

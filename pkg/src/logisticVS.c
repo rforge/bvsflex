@@ -273,16 +273,17 @@ void betaGAM_update(int n, int p, double *X,
 					double *b, double *h0, double g, double *Pi,
 					double *beta, int *GAM, double *LAM, double *Z,  
 					int *block, double T, int *numneigh, int *select,
-					double *logprior, double *logpost)
+					double *logprior, double *logpost,
+          int *pgam, double *bh0bgam)
 {	
 	//const double K1 = 0, K2 = 0; other options are not yet implemented
 	const int one = 1;
-	const double oned = 1.0;
-	const char Upper = 'U', Trans = 'T', NoLog = 'N', Log = 'L';
+	const double oned = 1.0, zerod = 0.0;
+	const char Upper = 'U', Trans = 'T', NoTrans = 'N', NoLog = 'N', Log = 'L';
   
-	int pgam = 0;
+	pgam[0] = 0;
 	for (int k = 0; k < p; k++) {
-		pgam += GAM[k];
+		pgam[0] += GAM[k];
 	}
 	
 	//multiply T to LAM
@@ -302,27 +303,27 @@ void betaGAM_update(int n, int p, double *X,
 	//(0) Compute values corresponding to current GAM 
 	//(the final Xgam after passing through betaGAM_update will be returned by reference for use in LAMZ_update)
 	
-	double Xgam[(pgam * n)];
+	double Xgam[(pgam[0] * n)];
 	matrixSubset(X, GAM, n, p, Xgam);
   
-  double bgam[pgam];
+  double bgam[pgam[0]];
   vectorSubset(b, GAM, p, bgam);
 	
-	double Vgam[pgam * pgam];
-	double Bgam[pgam];
+	double Vgam[pgam[0] * pgam[0]];
+	double Bgam[pgam[0]];
   
   //if h0 is a scalar and equal to 0 this indicates a "WLS g-prior"
   if(sizeof(h0)/sizeof(h0[0]) == 1 & h0[0] == 0){
-    Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, h0, g, bgam, LAM, Z);
+    Vgam_Bgam_update(Vgam, Bgam, *pgam, n, Xgam, h0, g, bgam, LAM, Z);
   }else{
-    double h0tmpgam[(p * pgam)], h0gam[(pgam * pgam)];
+    double h0tmpgam[(p * pgam[0])], h0gam[(pgam[0] * pgam[0])];
     matrixSubset(h0, GAM, p, p, h0tmpgam); //matrixSubset subsets wrt. columns
-    matrixSubsetRows(h0tmpgam, GAM, p, pgam, h0gam); //matrixSubsetRows subsets wrt. rows
+    matrixSubsetRows(h0tmpgam, GAM, p, *pgam, h0gam); //matrixSubsetRows subsets wrt. rows
   
-    Vgam_Bgam_update(Vgam, Bgam, pgam, n, Xgam, h0gam, g, bgam, LAM, Z);
+    Vgam_Bgam_update(Vgam, Bgam, *pgam, n, Xgam, h0gam, g, bgam, LAM, Z);
   }
   
-	double Pgam = Pgam_update(pgam, n, Xgam, bgam, Z, invLAM, dinvLAM, Vgam, NoLog);
+	double Pgam = Pgam_update(*pgam, n, Xgam, bgam, Z, invLAM, dinvLAM, Vgam, NoLog);
 	
 	//(1) Proposal for GAM
 	//(select gamma_i at random, find 'mates' and for all of these,
@@ -482,12 +483,12 @@ void betaGAM_update(int n, int p, double *X,
     //if h0 is a scalar and equal to 0 this indicates a "WLS g-prior"
     if(sizeof(h0)/sizeof(h0[0]) == 1 & h0[0] == 0){
       for (int i = 0; i < (pstar * pstar); i++) {
-        hstar[i] = (1.0/(g+1.0)) * Hstar[i];
+        h0star[i] = (g/(n*g+1.0)) * Hstar[i];
+        //since here h0star cannot be obtained by subsetting h0, use this "backwards way"
   	  }
-    }else{
-      for (int i = 0; i < (pstar * pstar); i++) {
-    	  hstar[i] = (1.0/g) * h0star[i];
-		  }
+    }
+    for (int i = 0; i < (pstar * pstar); i++) {
+    	hstar[i] = (1.0/g) * h0star[i];
     }
 		
 		logpostbeta = dmvnorm(betastar, pstar, Bstar, Hstar, Log, pstar);
@@ -496,6 +497,17 @@ void betaGAM_update(int n, int p, double *X,
   
 	logprior[0] = logpriorGAM + logpriorbeta;
 	logpost[0] = logPgam + logpostbeta;  //logpriorGAM cancels out anyway
+  
+  //For g_update_IG:
+  //bh0bgam = t(beta_bstar) %*% h0star %*% (beta_bstar), where beta_bstar = beta_star - b_star:
+  double beta_bstar[pstar];
+  for(int i=0; i<pstar; i++){
+    beta_bstar[i] = betastar[i] - bstar[i];
+  }
+  double h0_betabstar[pstar];
+  F77_NAME(dgemv)(&NoTrans, &pstar, &pstar, &oned, h0star, &pstar, beta_bstar, &one, &zerod, h0_betabstar, &one);  
+  bh0bgam[0] = F77_NAME(ddot)(&pstar, h0_betabstar, &one, beta_bstar, &one);  
+  pgam[0] = pstar;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -728,12 +740,17 @@ void Pi_update(double *Pi, int *GAM, double *aBeta, double *bBeta, int p){
 }
 
 // class of inverse gamma priors for g:
-void g_update_IG(double *g, double aG, double bG){
-   *g = 1.0 / rgamma(aG, 1.0 / bG); 
-   //Note: Rmath.h rgamma uses shape and rate parameters, while 
-   //rgamma() in R uses shape and scale parameters per default and 
-   //aG and bG are meant as shape and scale parameters.
+void g_update_IG(double *g, double aG, double bG, int pgam, double bh0bgam){                    
+                            
+  double aGupdate = aG + pgam/2.0;
+  double bGupdate = bG + 0.5 * bh0bgam;
+  
+  *g = 1.0 / rgamma(aGupdate, bGupdate); 
+  //Note: Rmath.h rgamma uses shape and rate parameters ->
+  //rgamma(aGupdate, bGupdate) here is equivalent to rgamma(aGupdate, scale=1/bGupdate) in R.
+  //Therefore we use: X ~ Gamma(a,1/b) -> g = 1/X ~ IG(a,b)
 }
+
 // hyper-g prior for g according to Liang et al. (2008) 
 // (use g/(1+g) ~ Beta formulation):
 void g_update_hyperg(double *g, double aG){
@@ -773,12 +790,15 @@ void logisticVS(double *X, double *Y, int *n, int *p,
     Pi[i] = (aBeta[i] / (aBeta[i] + bBeta[i]));
   }
   
- 	int GAM[*p];
-	double beta[*p];
+ 	int GAM[*p], pgam[0];
+	double beta[*p], bh0bgam[0];
+  pgam[0] = 0;
 	for (int i = 0; i < *p; i++) {
 		double U = runif(0.0, 1.0);
 		GAM[i] = (U < Pi[i] ? 1 : 0);
 		beta[i] = 0.0;
+    
+    pgam[0] += GAM[i];
 	}
   
 	double LAM[*n];
@@ -811,15 +831,6 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		if (!(K % 10)) R_CheckUserInterrupt();
   	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);    
     
-    if(*gupdate == 1){
-      //class of inverse-gamma priors
-      g_update_IG(g, *aG, *bG);
-    }
-    if(*gupdate == 2){
-      //class of inverse-gamma priors
-      g_update_hyperg(g, *aG);
-    }
-    
     if(*Piupdate == 1){
       Pi_update(Pi, GAM, aBeta, bBeta, *p);
     }
@@ -827,11 +838,21 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		betaGAM_update(*n, *p, X,
 					   b, h0, *g, Pi,
 					   beta, GAM, LAM, Z,
-					   block, T, numneigh, select, logpriorGAMbeta, logpostGAMbeta);
+					   block, T, numneigh, select, logpriorGAMbeta, logpostGAMbeta, 
+             pgam, bh0bgam);
     
 		LAMz_update(*n, *p, X, Y,
 					beta, GAM, LAM, Z,
 					T, logLAMz);
+          
+    if(*gupdate == 1){
+      //class of inverse-gamma priors
+      g_update_IG(g, *aG, *bG, *pgam, *bh0bgam);
+    }
+    if(*gupdate == 2){
+      //class of inverse-gamma priors
+      g_update_hyperg(g, *aG);
+    }
     
 		if (!(K % *thin)) {
 			K2 = K / *thin;
