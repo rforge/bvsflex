@@ -8,12 +8,14 @@
 #v0.4: MZ, 2015-02-27, bug fix (was introduced in version 0.35), add wlsgprior = "weighted least squares g-prior" as option 
 #      (then h is computed as 1/g * t(Xgam)%*%invLAMXgam in each iteration instead of using a prespecified h0. 
 #       h0 is ignored in this case)
+#v0.41-v0.43: MZ, 2015-03-02/03, bug fixes (in g_update), h in wlsgprior is now computed as 1/g * 1/n t(Xgam)%*%invLAMXgam
 
 logisticVS <- function(X, Y, b, h0, g=1, block=NULL, 
                        aBeta=NULL, bBeta=NULL,
                        aG=NULL, bG=NULL,
                        MCMC, thinn=1, seed=1234, outdir=NULL, 
-                       Piupdate=FALSE, gupdate="none", wlsgprior=FALSE){
+                       Piupdate=FALSE, gupdate="none", 
+                       wlsgprior=FALSE, sigmaG=NULL){
  
   is.wholenumber <- function(x, tol = .Machine$double.eps^0.5)  abs(x - round(x)) < tol
   
@@ -78,9 +80,12 @@ logisticVS <- function(X, Y, b, h0, g=1, block=NULL,
   if(gupdate == "hyperg"){
     gupdate.int <- 2;
     
-    if(is.null(aG)) aG <- 3; #default: prior suggested by Liang et al. (2008)
-    if(aG <= 2) stop("The parameter 'aG' for gupdate='hyperg' has to be larger than 2.\n")
+    #default: prior suggested by Liang et al. (2008), also see Sheng and Li (2014)
+    if(is.null(aG)) aG <- 1;
+    if(is.null(bG)) bG <- 0.5;
+    if(aG <=0 | bG <= 0) stop("The parameters 'aG' and 'bG' for gupdate='hyperg' have to be positive.\n")
   }
+  if(is.null(sigmaG)) sigmaG <- 1;
   
   #Center X[,j] (j=1,...,p) and Y (because we don't have an intercept in the model):
   Xs <- scale(X, scale=FALSE);
@@ -91,7 +96,7 @@ logisticVS <- function(X, Y, b, h0, g=1, block=NULL,
       X = as.double(Xs), Y = as.double(Ys), n = as.integer(n), p = as.integer(p),
       b = as.double(b), h0 = as.double(h0), g = as.double(g),
       aBeta=as.double(aBeta), bBeta=as.double(bBeta),
-      aG=as.double(aG), bG=as.double(bG),
+      aG=as.double(aG), bG=as.double(bG), sigmaG=as.double(sigmaG),
       block = as.integer(block), MCMC = as.integer(MCMC), 
       thinn = as.integer(thinn),
       Piupdate = as.integer(Piupdate),

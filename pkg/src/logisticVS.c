@@ -169,6 +169,7 @@ double dmvnorm(double *Z, int n, double *Zmean, double *Zprec, char Log, int pga
 	return(retval);
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////
 void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 					  double *Xgam, double *h0gam, double g, double *bgam, double *LAM, double *Z){
 	
@@ -193,16 +194,16 @@ void Vgam_Bgam_update(double *Vgam, double *Bgam, int pgam, int n,
 		F77_NAME(dgemm)(&NoTrans, &NoTrans, &n, &pgam, &n, &oned, dsqrtinvLAM, &n, Xgam, &n, &zerod, sqrtinvLAMXgam, &n);
 
 		// 1) compute t(Xgam)%*%invLAM%*%Xgam + hgam, 
-    // in case of the "WLS g-prior" this is equal to (g+1)/g %*% t(Xgam)%*%invLAM%*%Xgam
+    // in case of the "WLS g-prior" this is equal to (ng+1)/ng %*% t(Xgam)%*%invLAM%*%Xgam
     
     //if h0 is a scalar and equal to 0 this indicates a "WLS g-prior"
     double hgam[(pgam * pgam)];
     if(sizeof(h0gam)/sizeof(h0gam[0]) == 1 & h0gam[0] == 0){
-      double scalar = (g+1.0)/g;
+      double scalar = (n*g+1.0)/(n*g);
   	  F77_NAME(dgemm)(&Trans, &NoTrans, &pgam, &pgam, &n, &scalar, sqrtinvLAMXgam, &n, sqrtinvLAMXgam, &n, &zerod, Vgam, &pgam);	
       
       for (int i=0; i<(pgam * pgam); i++) {
-        hgam[i] = 1.0/(g+1.0) * Vgam[i]; //because here Vgam is still actually solve(Vgam)=Hgam
+        hgam[i] = 1.0/(n*g+1.0) * Vgam[i]; //because here Vgam is still actually solve(Vgam)=Hgam
       }	
     }else{
       for (int i=0; i<(pgam * pgam); i++) {
@@ -498,10 +499,10 @@ void betaGAM_update(int n, int p, double *X,
 	logprior[0] = logpriorGAM + logpriorbeta;
 	logpost[0] = logPgam + logpostbeta;  //logpriorGAM cancels out anyway
   
-  //For g_update_IG:
+  //For g_update_IG and g_update_hyperg:
   //bh0bgam = t(beta_bstar) %*% h0star %*% (beta_bstar), where beta_bstar = beta_star - b_star:
   double beta_bstar[pstar];
-  for(int i=0; i<pstar; i++){
+  for(int i = 0; i < pstar; i++){
     beta_bstar[i] = betastar[i] - bstar[i];
   }
   double h0_betabstar[pstar];
@@ -751,11 +752,26 @@ void g_update_IG(double *g, double aG, double bG, int pgam, double bh0bgam){
   //Therefore we use: X ~ Gamma(a,1/b) -> g = 1/X ~ IG(a,b)
 }
 
-// hyper-g prior for g according to Liang et al. (2008) 
-// (use g/(1+g) ~ Beta formulation):
-void g_update_hyperg(double *g, double aG){
-   double gratio = rbeta(1.0, 0.5 * aG - 1.0);
-   *g = 1.0 / (1.0 / gratio - 1.0);
+// hyper-g prior for g according to Liang et al. (2008) and others: g/(1+g) ~ Beta(aG,bG):
+// sigmaG is the standard deviation of the proposal density for log(g)
+void g_update_hyperg(double *g, double aG, double bG, int pgam, double bh0bgam, double sigmaG){
+  
+  double logg_old = log(*g);
+  double logg_new = rnorm(logg_old, sigmaG);
+  double g_new = exp(logg_new);
+  
+  //log prior of g (see for example Shang and Li 2014, equation 3.5):
+  double lpg_old = -lbeta(aG,bG) + (aG-1) * logg_old - (aG+bG) * log(1+*g);
+  double lpg_new = -lbeta(aG,bG) + (aG-1) * logg_new - (aG+bG) * log(1+g_new);
+  
+  //p(logg| beta, gamma, b0, h0) = p(exp(logg)|beta, gamma, b0, h0) * exp(logg) (with exp(logg_old) = *g).
+  //compute log of p(logg| beta, gamma, b0, h0):
+  double lPlogg_old = -pgam/2.0 * logg_old - bh0bgam/(2.0 * *g) + lpg_old + logg_old;
+  double lPlogg_new = -pgam/2.0 * logg_new - bh0bgam/(2.0 * g_new) + lpg_new + logg_new;
+  
+  double ratio = exp(lPlogg_new - lPlogg_old);
+  double U = runif(0.0, 1.0);
+  if(U < ratio) *g = g_new;
 }
 
 
@@ -768,7 +784,7 @@ void g_update_hyperg(double *g, double aG){
 void logisticVS(double *X, double *Y, int *n, int *p,
   			double *b, double *h0, double *g, 
         double *aBeta, double *bBeta,
-        double *aG, double *bG,
+        double *aG, double *bG, double *sigmaG,
 				int *block, int *MCMC, int *thins, 
         int *Piupdate, int *gupdate){
 	
@@ -850,8 +866,8 @@ void logisticVS(double *X, double *Y, int *n, int *p,
       g_update_IG(g, *aG, *bG, *pgam, *bh0bgam);
     }
     if(*gupdate == 2){
-      //class of inverse-gamma priors
-      g_update_hyperg(g, *aG);
+      //class of hyper-g priors (see for example Liang et al. 2008 and Shang and Li 2014)
+      g_update_hyperg(g, *aG, *bG, *pgam, *bh0bgam, *sigmaG);
     }
     
 		if (!(K % *thin)) {
