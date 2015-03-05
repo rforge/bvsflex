@@ -806,8 +806,8 @@ void logisticVS(double *X, double *Y, int *n, int *p,
     Pi[i] = (aBeta[i] / (aBeta[i] + bBeta[i]));
   }
   
- 	int GAM[*p], pgam[0];
-	double beta[*p], bh0bgam[0];
+ 	int GAM[*p], pgam[1];
+	double beta[*p], bh0bgam[1];
   pgam[0] = 0;
 	for (int i = 0; i < *p; i++) {
 		double U = runif(0.0, 1.0);
