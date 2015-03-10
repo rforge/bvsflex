@@ -75,12 +75,12 @@ logisticVS <- function(X, Y, b, h0, g=1, block=NULL,
     #default: Zellner-Siow prior (Zellner & Siow 1980)
     if(is.null(aG)) aG <- 0.5;
     if(is.null(bG)) bG <- 0.5;
-    if(aG <=0 | bG <= 0) stop("The parameters 'aG' and 'bG' for gupdate='IG' have to be positive.\n")
+    if(aG <0 | bG < 0) stop("The parameters 'aG' and 'bG' for gupdate='IG' have to be non-negative\n")
   }
   if(gupdate == "hyperg"){
     gupdate.int <- 2;
     
-    #default: prior suggested by Liang et al. (2008), also see Sheng and Li (2014)
+    #default: prior suggested by Liang et al. (2008), also see Shang and Li (2014)
     if(is.null(aG)) aG <- 1;
     if(is.null(bG)) bG <- 0.5;
     if(aG <=0 | bG <= 0) stop("The parameters 'aG' and 'bG' for gupdate='hyperg' have to be positive.\n")

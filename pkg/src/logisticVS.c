@@ -746,7 +746,7 @@ void g_update_IG(double *g, double aG, double bG, int pgam, double bh0bgam){
   double aGupdate = aG + pgam/2.0;
   double bGupdate = bG + 0.5 * bh0bgam;
   
-  *g = 1.0 / rgamma(aGupdate, bGupdate); 
+  *g = 1.0 / rgamma(aGupdate,  1.0 / bGupdate); 
   //Note: Rmath.h rgamma uses shape and rate parameters ->
   //rgamma(aGupdate, bGupdate) here is equivalent to rgamma(aGupdate, scale=1/bGupdate) in R.
   //Therefore we use: X ~ Gamma(a,1/b) -> g = 1/X ~ IG(a,b)
