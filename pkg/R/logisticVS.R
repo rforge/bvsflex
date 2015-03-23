@@ -8,7 +8,7 @@
 #v0.4: MZ, 2015-02-27, bug fix (was introduced in version 0.35), add wlsgprior = "weighted least squares g-prior" as option 
 #      (then h is computed as 1/g * t(Xgam)%*%invLAMXgam in each iteration instead of using a prespecified h0. 
 #       h0 is ignored in this case)
-#v0.41-v0.43: MZ, 2015-03-02/03, bug fixes (in g_update), h in wlsgprior is now computed as 1/g * 1/n t(Xgam)%*%invLAMXgam
+#v0.41-v0.45: MZ, MW, 2015-03-02 to 2015-03-10, bug fixes (in g_update), h in wlsgprior is now computed as 1/g * 1/n t(Xgam)%*%invLAMXgam
 
 logisticVS <- function(X, Y, b, h0, g=1, block=NULL, 
                        aBeta=NULL, bBeta=NULL,
