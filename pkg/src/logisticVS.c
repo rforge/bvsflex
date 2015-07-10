@@ -733,10 +733,71 @@ void LAMz_update(int n, int p, double *X, double *Y,
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+void mu_phi_update(double *mu, double *phi, double *Pi, int p, 
+                   double aPhi, double bPhi, double *g0, double *m0,
+                   double sigmaMu, double sigmaPhi){
+  //Update prior parameters of pi:
+  //Since the hyper-priors for mu and phi are not conjugate, we need to use
+  //Random-walk Metropolis-Hastings (on log-scale) within Gibbs to sample from p(mu,phi | Pi) (see Branscum 2007, 2.2)
+  //(alternative: adaptive rejection sampling - see Hanson et al., 2003, appendix A)
+  //
+  //Problem: this will slow down things somewhat...
+  //Should we introduce adaptive phase, where sigmaMu and sigmaPhi are tuned to guarantee a good acceptance probability?
+  
+  for (int i = 0; i < p; i++) {
+    //Unnormalised full conditionals:
+    //p(mu_i, phi_i | pi_i) \propto p(pi_i | mu_i, phi_i) * p(mu_i) * p(phi_i)
+    
+    //Beta distribution does not allow values exactly 0 or 1
+    double Pi_i = Pi[i];
+    if(Pi_i == 0) Pi_i = 1e-7;
+    if(Pi_i == 1) Pi_i = 1 - 1e-7;
+    
+    double mu_new = exp(-fabs(rnorm(log(mu[i]), sigmaMu))); //since mu[i] is in (0,1), log(mu[i]) is negative
+    double phi_new = exp(rnorm(log(phi[i]), sigmaPhi));
+  
+    //log of unnormalised full conditional of mu_i and phi_i (part that does not cancel out):
+    double lp_old = dbeta(mu[i], g0[i]*m0[i], g0[i]*(1.0-m0[i]), 1) + dgamma(phi[i], aPhi, 1.0/bPhi, 1) + dbeta(Pi_i, phi[i]*mu[i], phi[i]*(1.0-mu[i]), 1);
+    double lp_new = dbeta(mu_new, g0[i]*m0[i], g0[i]*(1.0-m0[i]), 1) + dgamma(phi_new, aPhi, 1.0/bPhi, 1) + dbeta(Pi_i, phi_new*mu_new, phi_new*(1.0-mu_new), 1);
+  
+    double lratio = lp_new - lp_old;
+    
+    /*
+    if(i == (p-1)){
+    Rprintf("\nPi = %.3f\n", Pi_i);
+    Rprintf("Mu (old) = %.3f, ", mu[i]);
+    Rprintf("Mu (new) = %.3f, ", mu_new);
+    Rprintf("Phi (old) = %.3f, ", phi[i]);
+    Rprintf("Phi (new) = %.3f, ", phi_new);
+    Rprintf("log p (old) = %.3f, ", lp_old);
+    Rprintf("log p (new) = %.3f, ", lp_new);
+    Rprintf("ratio = %.3f\n", exp(lratio));
+    }
+    */
+    
+    double lU = log(runif(0.0, 1.0));
+    if(lU < lratio){
+      mu[i] = mu_new;
+      phi[i] = phi_new;
+    }
+  }  
+}
+
+/*
 void Pi_update(double *Pi, int *GAM, double *aBeta, double *bBeta, int p){
    //Direct sampling:
   for (int i = 0; i < p; i++) {
     Pi[i] = rbeta(aBeta[i]+GAM[i], bBeta[i]+1.0-GAM[i]);
+  }
+}
+*/
+void Pi_update(double *Pi, int *GAM, double *mu, double *phi, int p){
+  //Direct sampling:
+  double a, b;
+  for (int i = 0; i < p; i++) {
+    a = phi[i] * mu[i];
+    b = phi[i] * (1.0 - mu[i]);
+    Pi[i] = rbeta(a + GAM[i], b + 1.0 - GAM[i]);
   }
 }
 
@@ -776,17 +837,19 @@ void g_update_hyperg(double *g, double aG, double bG, int pgam, double bh0bgam, 
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-//New version (with aBeta and bBeta and allowing for hyper-prior for g)
+//New version (with mu and phi parametrization of Beta prior for pi and allowing for hyper-prior for g)
 //Now with prior precision h0 instead of prior variance v0. 
 //g keeps its meaning, therefore, the full prior precision matrix is h = (1/g) * h0.
 //if h0 is a scalar (array of length 1), this indicates the use of the "weighted least-squares g-prior" 
 //instead of a prespecified precision matrix h0.
 void logisticVS(double *X, double *Y, int *n, int *p,
   			double *b, double *h0, double *g, 
-        double *aBeta, double *bBeta,
+        double *mu, double *phi,
+        double *m0, double *g0, double *sigmaMu,
+        double *aPhi, double *bPhi, double *sigmaPhi,
         double *aG, double *bG, double *sigmaG,
 				int *block, int *MCMC, int *thins, 
-        int *Piupdate, int *gupdate){
+        int *Piupdate, int *MuPhiUpdate, int *gupdate){
 	
 	GetRNGstate();	
 	
@@ -803,7 +866,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
   
   double Pi[*p];
   for (int i = 0; i < *p; i++){
-    Pi[i] = (aBeta[i] / (aBeta[i] + bBeta[i]));
+    Pi[i] = mu[i];
   }
   
  	int GAM[*p], pgam[1];
@@ -847,8 +910,12 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		if (!(K % 10)) R_CheckUserInterrupt();
   	if (!((K+1) % 1000)) Rprintf("iteration %d\n", K+1);    
     
+    if(*MuPhiUpdate == 1){
+      mu_phi_update(mu, phi, Pi, *p, *aPhi, *bPhi, g0, m0, *sigmaMu, *sigmaPhi);
+    }
+    
     if(*Piupdate == 1){
-      Pi_update(Pi, GAM, aBeta, bBeta, *p);
+      Pi_update(Pi, GAM, mu, phi, *p);
     }
   
 		betaGAM_update(*n, *p, X,

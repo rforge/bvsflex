@@ -1,74 +1,65 @@
-getBVSflex=function(path,burnin,thin,extraThin,m,geneSymbols){ 
+getBVSflex= function (path, burnin, thin, extraThin, m, geneSymbols) 
+{
   require(Matrix)
-  
-  wd=getwd()
+  wd = getwd()
   setwd(path)
-  
-  #Get the top m models:
-    logprobs <- scan("logprobs.txt",na.strings="1.#INF")
-    lp.after <- logprobs[-(1:(burnin/thin))]
-    logprobs=logprobs[seq(1,length(logprobs),by=extraThin)]
-    lp.after=lp.after[seq(1,length(lp.after),by=extraThin)]
-    
-    lp.max <- sort(lp.after, decreasing=TRUE)[m]
-    lp.top <- which(lp.after >= lp.max) + (burnin/(thin*extraThin))
-
-  gam <- read.table("GAM.txt",fill=T)
-  gam= gam[complete.cases(gam),]
-  gam <- sparseMatrix(i=gam[,1], j=gam[,2], x=gam[,3])
+  logprobs <- scan("logprobs.txt", na.strings = "1.#INF")
+  lp.after <- logprobs[-(1:(burnin/thin))]
+  logprobs = logprobs[seq(1, length(logprobs), by = extraThin)]
+  lp.after = lp.after[seq(1, length(lp.after), by = extraThin)]
+  lp.max <- sort(lp.after, decreasing = TRUE)[m]
+  lp.top <- which(lp.after >= lp.max) + (burnin/(thin * extraThin))
+  gam <- read.table("GAM.txt", fill = T)
+  gam = gam[complete.cases(gam), ]
+  gam <- sparseMatrix(i = gam[, 1], j = gam[, 2], x = gam[, 
+                                                          3])
   gam <- as.matrix(gam)
-  gam=gam[,seq(1,ncol(gam),by=extraThin)]
+  gam = gam[, seq(1, ncol(gam), by = extraThin)]
   modelsize <- apply(gam, 2, sum)
-
-
-  bet <- read.table("beta.txt",fill=T)
-  bet= bet[complete.cases(bet),]
-  bet <- sparseMatrix(i=bet[,1], j=bet[,2], x=bet[,3])
+  bet <- read.table("beta.txt", fill = T)
+  bet = bet[complete.cases(bet), ]
+  bet <- sparseMatrix(i = bet[, 1], j = bet[, 2], x = bet[, 
+                                                          3])
   bet <- as.matrix(bet)
-  bet=bet[,seq(1,ncol(bet),by=extraThin)]
-  
+  bet = bet[, seq(1, ncol(bet), by = extraThin)]
   setwd(wd)
-
-#   #(1) "0.05-quantile probability model":
-#   gam.mean <- apply(gam[,-(1:(burnin/(thin*extraThin))),drop=FALSE], 1, mean)
-#   #plot(gam.mean)
-#   gam.qpm <- which(gam.mean > 0.05)
-#   bet.qpm <- apply(bet[gam.qpm,-(1:(burnin/(thin*extraThin))),drop=FALSE], 1, mean)
-  
-  #(2) Top models based on logprobs:
-  top.beta <- bet[,lp.top,drop=FALSE]
-  top.list <- table(unlist(apply(top.beta, 2, function(x){which(x!=0)})))
-
-
+  top.beta <- bet[, lp.top, drop = FALSE]
+  top.list <- table(unlist(apply(top.beta, 2, function(x) {
+    which(x != 0)
+  })))
   gamma.p <- t(gam)
   beta.p <- t(bet)
-  bet.mean <- apply(beta.p[-(1:(burnin/(thin*extraThin))),], 2, function(x){mean(x[x!=0])})
+  bet.mean <- apply(beta.p[-(1:(burnin/(thin * extraThin))), 
+                           ], 2, function(x) {
+                             mean(x[x != 0])
+                           })
   bet.mean[is.na(bet.mean)] <- 0
-  bet.sd <- apply(beta.p[-(1:(burnin/(thin*extraThin))),], 2, function(x){sd(x[x!=0])})
+  bet.sd <- apply(beta.p[-(1:(burnin/(thin * extraThin))), 
+                         ], 2, function(x) {
+                           sd(x[x != 0])
+                         })
   bet.sd[is.na(bet.sd)] <- 0
-  #bet.mean=bet.mean[bet.sd!=0]
-  #bet.sd=bet.sd[bet.sd!=0]
-  
-  gam.mean <- apply(gamma.p[-(1:(burnin/(thin*extraThin))),], 2, mean)
-  gam.sd <- apply(gamma.p[-(1:(burnin/(thin*extraThin))),]
-                  , 2, sd)
-  #gam.mean=gam.mean[gam.sd!=0]
-  #gam.sd=gam.sd[gam.sd!=0]
-
+  gam.mean <- apply(gamma.p[-(1:(burnin/(thin * extraThin))), 
+                            ], 2, mean)
+  gam.sd <- apply(gamma.p[-(1:(burnin/(thin * extraThin))), 
+                          ], 2, sd)
   print(summary(logprobs))
   print(summary(modelsize))
-
-  results=list(
-    logprobs=logprobs,lp.top=lp.top, modelsize=modelsize,top.beta=top.beta,top.list=top.list,
-    gamma=gamma.p, beta=beta.p,beta.mean=bet.mean,beta.sd=bet.sd,gamma.mean=gam.mean,gamma.sd=gam.sd,
-    burnin=burnin,thin=thin,extraThin=extraThin ,geneSymbols=geneSymbols
-    )
-class(results)="bvsflex"
-results
+  
+  names(bet.mean)=  names(gam.mean)=names(bet.sd)=names(gam.sd)=geneSymbols
+  
+  results = list(logprobs = logprobs, lp.top = lp.top, modelsize = modelsize, 
+                 top.beta = top.beta, top.list = top.list, gamma = gamma.p, 
+                 beta = beta.p, beta.mean = bet.mean, beta.sd = bet.sd, 
+                 gamma.mean = gam.mean, gamma.sd = gam.sd, burnin = burnin, 
+                 thin = thin, extraThin = extraThin, geneSymbols = geneSymbols)
+  class(results) = "bvsflex"
+  results
 }
 
 
-plotPaths.bvsflex=function(object,burnin,thin){
+
+plotPaths=function(object,burnin,thin){
   require(ggplot2)
   require(grid)
   grid.newpage();pushViewport(viewport(layout = grid.layout(2,1)))
@@ -79,47 +70,22 @@ plotPaths.bvsflex=function(object,burnin,thin){
 }
 
 
-plotACF.bvsflex=function(object,burnin,thin,...) with(object, plot(acf(modelsize[-(1:(burnin/(thin)))],lag=50),main="modelsize",...))
+plotACF=function(object,burnin,thin,...) with(object, plot(acf(modelsize[-(1:(burnin/(thin)))],lag=50),main="modelsize",...))
 
 
-predict.bvsflex=function(object,X2,sdX) with(object, X2 %*% t(t(top.beta)*sdX))
-
-
-ROC.bvsflex=function(object,X2,Y2,sdX,...){
-  require(pROC)
-  require(ROCR)
-  
-  linpred <- predict.bvsflex(object,X2,sdX)
-  
-  err <- rep(NA, ncol(linpred))
-  for(i in 1:ncol(linpred)){
-    tab <- table(Y2, linpred[,i]>0)
-    # tab <- table(Y2, factor(linpred[,i]>0,levels=c(FALSE,TRUE)))
-    err[i] <- (tab[1,2]+tab[2,1])/sum(tab)
+#predict.bvsflex=function(object,X2,sdX) with(object, X2 %*% t(t(top.beta)*sdX))
+predict.bvsflex=function (object, X2, sdX, which=NULL){
+  if (is.null(which)) beta=object$top.beta
+  else {
+    beta=rep(0,ncol(X2))
+    beta[which(names(object$beta.mean)%in%which)]=object$beta.mean[which]
   }
-  
-  auc <- rep(NA, ncol(linpred))
-  roc <- roc(Y2, linpred[,1])
-  for(i in 1:ncol(linpred)){
-    roc <- roc(Y2, linpred[,i]) 
-    auc[i] <- roc$auc
-  }
-  pred <- prediction(linpred, matrix(rep(Y2, m),ncol=m))
-  perf <- performance(pred,"tpr","fpr")
-  
-  op<-  par(mar=c(4,4,2,2), mgp=c(2.5,1,0))
-  plot(perf, col="gray", ...)
-  plot(perf, avg="vertical", spread.estimate="stderror",
-       show.spread.at=seq(min(linpred),max(linpred),0.1), add=TRUE)
-  abline(0,1)
-  par(font=2)
-  legend("bottomright", legend=c(paste("mean ERR =",round(mean(err),3)),
-                                 paste("mean AUC =",round(mean(auc),3))), bty="n",cex=1.3)
-  par(op)
+  X2 %*% t(t(beta) * sdX)
 }
 
 
-plotBeta.bvsflex=function(object,chromosomes=NULL,...){
+
+plotBeta=function(object,chromosomes=NULL,...){
   require(gplots)
   op<-par(mgp=c(2.5,1,0), mar=c(4,4,1,1))
   #  locs <- match(unique(annoX$Chr), annoX$Chr)
@@ -132,23 +98,10 @@ plotBeta.bvsflex=function(object,chromosomes=NULL,...){
   par(op)
 }
 
-summary.bvsflex=function(object,cutoff=rev(c(0.01,0.05,0.1,0.2,0.5))){ #cutoff may be a vector
-  cat("Number of selected:","\n")
-  gmean=with(object,data.frame(gamma.mean,row.names=geneSymbols))
-  gmean=gmean[order(gmean$gamma.mean,decreasing=T),,drop=F]
-  numincl=as.matrix(sapply(cutoff,function(x) sum(gmean>x)))
-  rownames(numincl)=paste0(">",cutoff)
-  incl=(lapply(cutoff,function(x) (gmean)[gmean>x,,drop=F]))
-  names(incl)=rownames(numincl)
-  print(numincl)
-  cat("\n\n")
-  print(incl)
-  cat("\n\n")
-}
 
 
 
-plotGamma.bvsflex=function(object,cutoff=c(0.05,0.1),chromosomes=NULL,names=NULL,ylim=c(0,0.24),... ) {#cutoff vector of cutoffs (maximum length 3); text vector of same length specifying whether associated gene symbols should be printed
+plotGamma=function(object,cutoff=c(0.05,0.1),chromosomes=NULL,names=NULL,ylim=c(0,0.24),... ) {#cutoff vector of cutoffs (maximum length 3); text vector of same length specifying whether associated gene symbols should be printed
   require(gplots)
   if (is.null(names)) names=rep(FALSE,length(cutoff))
   op<-par(mgp=c(2.5,1,0), mar=c(4,4,1,1))
@@ -184,7 +137,7 @@ plotGamma.bvsflex=function(object,cutoff=c(0.05,0.1),chromosomes=NULL,names=NULL
 }
 
 
-plotBetaGamma.bvsflex=function(object,cutoff,ylim=c(0,0.24),... ){
+plotBetaGamma=function(object,cutoff,ylim=c(0,0.24),... ){
   require(gplots)
   op<- par(mgp=c(2.5,1,0), mar=c(4,4,1,1))
   with(object,plotCI(x=beta.mean, y=gamma.mean, li=ifelse(gamma.mean-gamma.sd > 0, gamma.mean-gamma.sd, 0), ui=gamma.mean+gamma.sd, 
@@ -207,5 +160,143 @@ plotBetaGamma.bvsflex=function(object,cutoff,ylim=c(0,0.24),... ){
   }
   par(op)
 }
+
+summary.bvsflex=function(object,cutoff=rev(c(0.01,0.05,0.1,0.2,0.5))){ #cutoff may be a vector
+  gmean=with(object,data.frame(gamma.mean,row.names=geneSymbols))
+  gmean=gmean[order(gmean$gamma.mean,decreasing=T),,drop=F]
+  numincl=as.matrix(sapply(cutoff,function(x) sum(gmean>x)))
+  rownames(numincl)=paste0(">",cutoff)
+  incl=(lapply(cutoff,function(x) (gmean)[gmean>x,,drop=F]))
+  names(incl)=rownames(numincl)
+  #  cat("Number of selected:","\n")
+  #   print(numincl)
+  #   cat("\n\n")
+  #   print(incl)
+  #   cat("\n\n")
+  
+  res=(list(numincl=numincl,incl=incl,gmean=gmean))
+  class(res)="summary.bvsflex"
+  res
+}
+
+print.summary.bvsflex=function(object,...){
+  cat("Number of selected:","\n")
+  print(object$numincl)
+  cat("\n\n")
+  print(object$incl)
+  cat("\n\n")
+}
+
+
+ROC=function (object, X2, Y2, sdX, which=NULL, ...) 
+{
+  if (is.null(which)) m=length(r1$lp.top) else m=1
+  require(pROC)
+  require(ROCR)
+  linpred <- predict(object, X2, sdX,which)
+  err <- rep(NA, ncol(linpred))
+  for (i in 1:ncol(linpred)) {
+    tab <- table(Y2, factor(linpred[, i] > 0,levels=c("FALSE","TRUE")))
+    err[i] <- (tab[1, 2] + tab[2, 1])/sum(tab)
+  }
+  auc <- rep(NA, ncol(linpred))
+  roc <- roc(Y2, linpred[, 1])
+  for (i in 1:ncol(linpred)) {
+    roc <- roc(Y2, linpred[, i])
+    auc[i] <- roc$auc
+  }
+  pred <- prediction(linpred, matrix(rep(Y2, m), ncol = m))
+  perf <- performance(pred, "tpr", "fpr")
+  op <- par(mar = c(4, 4, 2, 2), mgp = c(2.5, 1, 0))
+  plot(perf, col = "gray", ...)
+  plot(perf, avg = "vertical", spread.estimate = "stderror", 
+       show.spread.at = seq(min(linpred), max(linpred), 0.1), 
+       add = TRUE)
+  abline(0, 1)
+  par(font = 2)
+  legend("bottomright", legend = c(paste(ifelse(m>1,yes ="mean ERR =",no = "ERR ="), round(mean(err), 3)), 
+                                   paste(ifelse(m>1,yes ="mean AUC =",no = "AUC ="), round(mean(auc), 3))), 
+         bty = "n", cex = 1.3)
+  par(op)
+}
+
+
+FDR=function(lambda,pi) sum((1-pi)*as.numeric(pi>=lambda))/sum(as.numeric(pi>=lambda))
+
+
+
+#######################
+# elicitation auxillaries
+
+# Bootstrap distribution of the variance
+resampleVar=function(x,rep=10000) {
+  replicate(rep, {
+    all <- sample(c(x),length(x),replace=T)
+    return(var(all))
+  })
+}
+
+VarOfVar=function(x,rep=10000) var(resampleVar(x,rep))
+
+
+# elicitaion of delta -> match bootstrap distivibution and beta distribution by matching the variances
+find.var=function(delta,m,var){
+  a=m*delta
+  b=delta*(1-m)
+  (a*b)/((a+b)^2*(a+b+1))-var
+}
+
+find.delta=function(m,var){
+  a=try( uniroot(find.var,c(1e-10,1e20),var=var,m=m)$root)
+  if (class(a)!="try-error") return(a) else return(NA)
+}
+
+
+# elicit Phi  
+elicitPhi=function(mu,range,coverage=0.95){
+  search=function(phi,mu,coverage,range){ #,lowerBound.aBeta
+    #?    #in order to force a to be >1 (condition such that density is uni modal (if a>1,b>1)), use a=a+1
+    #?    #for mode, possible values of a have to include 0 in uniroot, but for mode to be defined, aBeta has to be >1
+    #?    #  a=a+lowerBound.aBeta 
+    a=mu*phi
+    b=phi*(1-mu)
+    suppressWarnings(pbeta(range[2],a,b)-pbeta(range[1],a,b)-coverage)
+  }
+  aa <- uniroot(search, 
+                interval=c(1e-5,1e10),          #possible values of phi
+                tol = 0.001, 
+                coverage= coverage,              #coverage probability
+                mu=mu,             #prior mean or mode of pi   
+                range=range,                 #range of pi's that should be covered with error 1-coverage, 
+                #e.g. range=c(0,5*priorPi) and priorPi=k/p would induce that we allow prior model sizes in the interval of (0,5k)
+                #  lowerBound.aBeta=lowerBound.aBeta,
+                extendInt="yes")
+  
+  aa
+}
+
+
+# elicit a_Phi and b_phi
+elicitGamma=function(mean,range,coverage=0.95){
+  search=function(a,mean,coverage,range){ #,lowerBound.aBeta
+    #?    #in order to force a to be >1 (condition such that density is uni modal (if a>1,b>1)), use a=a+1
+    #?    #for mode, possible values of a have to include 0 in uniroot, but for mode to be defined, aBeta has to be >1
+    #?    #  a=a+lowerBound.aBeta 
+    b=mean/a
+    suppressWarnings(pgamma(range[2],shape=a,scale=b)-pgamma(range[1],shape=a,scale=b)-coverage)
+  }
+  aa <- uniroot(search, 
+                interval=c(1e-5,1e10),          #possible values of phi
+                tol = 0.001, 
+                coverage= coverage,              #coverage probability
+                mean=mean,             #prior mean or mode of pi   
+                range=range,                 #range of pi's that should be covered with error 1-coverage, 
+                #e.g. range=c(0,5*priorPi) and priorPi=k/p would induce that we allow prior model sizes in the interval of (0,5k)
+                #  lowerBound.aBeta=lowerBound.aBeta,
+                extendInt="yes")
+  
+  aa
+}
+
 
 
