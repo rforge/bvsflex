@@ -18,7 +18,7 @@ useDynLib("bvsflex")
 # Export all names
 exportPattern(".")
 
-import(pROC,ROCR)
+#import(pROC,ROCR)
 
 S3method(predict, bvsflex)
 S3method(summary, bvsflex)
