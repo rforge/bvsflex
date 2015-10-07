@@ -1,7 +1,7 @@
 Package: bvsflex
-Version: 0.47
-Date: 2015-07-09
-Author: Manuela Zucknick, Ana Corberan and Manuel Wiesenfarth
+Version: 0.48
+Date: 2015-10-08
+Author: Manuela Zucknick, Manuel Wiesenfarth
 Maintainer: Manuela Zucknick <m.k.zucknick@medisin.uio.no>
 Title: Integrative Bayesian variable selection with flexible priors
 Depends:
@@ -11,4 +11,3 @@ Description: The BVSflex package implements efficient Bayesian variable selectio
 License: GPL-2
 LazyLoad: yes
 NeedsCompilation: yes
-Packaged: 2015-07-09 18:12:18 UTC; wiesenfa

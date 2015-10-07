@@ -855,7 +855,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	
   const int one = 1;
   const double oned = 1.0, zerod = 0.0;
-  const char Upper = 'U', Lower = 'L', Trans = 'T', NoDiag = 'N';
+  const char NoTrans = 'N';
   
 	int thin[1];
 	thin[0] = thins[0];
@@ -867,7 +867,7 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 	double logpriorGAMbeta[1];
 	double logpostGAMbeta[1];
 	double logLAMz[1];
-  double loglik[1];
+  double loglik[*n];
   
   double Pi[*p];
   for (int i = 0; i < *p; i++){
@@ -946,17 +946,24 @@ void logisticVS(double *X, double *Y, int *n, int *p,
 		if (!(K % *thin)) {
 			K2 = K / *thin;
       
-      /*
-      double eta;
-      F77_NAME(dgemv)(&Trans, &p, &p, &oned, X, &p, beta, &one, &oned, eta, &one);
-      double prob = 1.0/(1.0 + exp(-eta));
-      loglik[0] = Y*log(prob) + (1.0-Y)*log(1.0-prob);
-		  */   
+      //Compute log-likelihood:
+      double betGAM[*p];
+      for(int i = 0; i<*p;i++){
+         betGAM[i] = (GAM[i]==1 ? beta[i] : 0.0);
+      }
+      double eta[*n];
+      //eta = X %*% beta:
+      F77_NAME(dgemv)(&NoTrans, n, p, &oned, X, n, betGAM, &one, &zerod, eta, &one);
+      for(int j = 0; j < *n; j++){
+        double prob = 1.0/(1.0 + exp(-eta[j]));
+        loglik[j] = Y[j]*log(prob) + (1.0-Y[j])*log(1.0-prob);
+        fprintf(fidloglik, "%.4f ", loglik[j]);  
+      }
+      fprintf(fidloglik, "\n");   
          
           //fprintf(fidpi, "%.4f ", Pi[0]);
           fprintf(fidg, "%.4f ", g[0]);
         	fprintf(fidlogprob, "%.4f ", logpriorGAMbeta[0] + logLAMz[0]);
-          fprintf(fidloglik, "%.4f ", loglik[0]);
         	fprintf(fidnumneigh, "%d ", numneigh[0]);
         	fprintf(fidselect, "%d ", select[0]);
 		
